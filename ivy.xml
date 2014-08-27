@@ -1,0 +1,42 @@
+<ivy-module version="2.0">
+  <info organisation="com.lucidworks" module="solr-couchbase-plugin" revision="${solr.couchbase.plugin.version}"/>
+
+  <configurations defaultconfmapping="default->default">
+    <conf name="default" extends="compile"/>
+    <conf name="compile"/>
+    <conf name="test" extends="compile"/>
+    <conf name="jetty" visibility="private"/>
+  </configurations>
+
+  <dependencies>
+    <!-- solr -->
+    <dependency org="org.apache.solr" name="solr-analysis-extras" rev="${solr.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-clustering" rev="${solr.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-dataimporthandler-extras" rev="${solr.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-langid" rev="${solr.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-test-framework" rev="${solr.version}" conf="test->default">
+        <exclude module="lucene-test-framework"/>
+    </dependency>
+    <dependency org="org.apache.solr" name="solr-uima" rev="${solr.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-velocity" rev="${solr.version}" conf="compile->default"/>
+    <!-- jetty -->
+    <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="${jetty.version}" conf="compile->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="${jetty.servlet.version}" conf="compile->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version}" conf="test->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-client" rev="${jetty.version}" conf="test->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-servlets" rev="${jetty.version}" conf="test->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-xml" rev="${jetty.version}" conf="test->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" conf="compile->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-client" rev="${jetty.version2}" conf="test->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version2}" conf="test->default;jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-servlets" rev="${jetty.version2}" conf="test->default;jetty->default"/>
+    <dependency org="javax.servlet" name="javax.servlet-api" rev="3.1.0" conf="compile->default"/>
+    <dependency org="org.mortbay.jetty" name="jetty-runner" rev="${jetty.runner.version}" conf="jetty->master"/>
+    
+    <dependency org="org.apache.lucene" name="lucene-test-framework" rev="${solr.version}" conf="test->master"/>
+    <dependency org="com.carrotsearch.randomizedtesting" name="randomizedtesting-runner" rev="2.1.6" conf="compile->default"/>
+    <dependency org="com.carrotsearch.randomizedtesting" name="junit4-ant" rev="2.1.6" conf="compile->default"/>
+    <dependency org="org.apache.ant" name="ant" rev="1.9.2" conf="test->default"/>
+    <dependency org="org.eclipse.jetty.orbit" name="javax.servlet" rev="3.0.0.v201112011016" conf="compile->default"/>
+  </dependencies>
+</ivy-module>

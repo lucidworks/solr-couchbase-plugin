@@ -1,0 +1,126 @@
+<project name="solr-couchbase-plugin"
+         xmlns:ivy="antlib:org.apache.ivy.ant">
+  <description>Solr Couchbase plugin</description>
+
+  <property file="build.properties"/>
+
+  <path id="libs">
+    <fileset dir="${lib.dir}" includes="**/*" />
+    <fileset dir="${build-lib.dir}" includes="*" />
+  </path>
+
+
+
+
+  <target name="ivy-download" unless="ivy.jar.exists">
+    <get src="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.version}/ivy-${ivy.version}.jar"
+         dest="${build-lib.dir}/ivy-${ivy.version}.jar"
+         usetimestamp="true"/>
+  </target>
+
+  <target name="ivy-init" depends="ivy-download" unless="skip.ivy" description="initialize ivy">
+    <path id="ivy.lib.path">
+      <fileset dir="${build-lib.dir}" includes="ivy-${ivy.version}.jar"/>
+    </path>
+    <taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path"/>
+    <ivy:settings file="${ivy.dir}/ivysettings.xml"/>
+  </target>
+  
+  <target name="ant-download" depends="ivy-init" unless="ant.exists">
+    <mkdir dir="${ant.dir}"/>
+    <ivy:retrieve
+        organisation="org.apache.ant"
+        module="ant"
+        revision="1.9.2"
+        pattern="${ant.dir}/[artifact]-[revision].[ext]"
+        inline="true"
+        conf="default"/>
+    <ivy:retrieve
+        organisation="ant"
+        module="optional"
+        revision="1.5.4"
+        pattern="${ant.dir}/[artifact]-[revision].[ext]"
+        inline="true"
+        conf="default"/>
+  </target>
+
+  <macrodef name="ivy-resolve-conf">
+    <attribute name="conf"/>
+    <attribute name="file"/>
+    <attribute name="lib.dir"/>
+    <attribute name="report.dir"/>
+    <sequential>
+      <echo>Resolving ivy conf: @{conf} for lib.dir: @{lib.dir} in module ${ant.project.name}</echo>
+      <ivy:resolve conf="@{conf}" file="@{file}" log="download-only"/>
+      <ivy:report conf="@{conf}" todir="@{report.dir}"/>
+      <ivy:retrieve conf="@{conf}" pattern="@{lib.dir}/@{conf}/[artifact]-[revision].[ext]"/>
+    </sequential>
+  </macrodef>
+  
+  <target name="ivy-resolve-compile" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="compile.resolved">
+    <ivy-resolve-conf conf="compile" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
+    <property name="compile.resolved" value="true" />
+  </target>
+
+  <target name="ivy-report" depends="ivy-init" description="generate Ivy reports for all confs">
+    <!--<fail message="apollo.version not set" unless="${apollo.version}"/>-->
+
+    <ivy:resolve conf="*" log="download-only"/>
+    <ivy:report conf="*" todir="${build.dir}/ivy-report"/>
+  </target>
+  
+  <target name="clean" description="Cleans build/ and lib/ directories of this project">
+    <delete dir="${build.dir}" />
+    <delete dir="${lib.dir}" />
+  </target>
+  
+  <target name="init">
+    <mkdir dir="${build.dir}" />
+    <mkdir dir="${lib.dir}"/>
+  </target>
+  
+  <target name="compile" depends="ivy-resolve-compile">
+    <echo>${basedir}</echo>
+    <mkdir dir="${classes.dir}"/>
+    <echo>Sources: ${sources.dir}</echo>
+    <javac srcdir="${sources.dir}"
+           source="${javac.source}"
+           target="${javac.target}"
+           debug="${debug}"
+           encoding="UTF-8"
+           destdir="${classes.dir}">
+      <classpath>
+        <path refid="libs"/>
+      </classpath>
+    </javac>
+    <copy todir="${classes.dir}" failonerror="false">
+      <fileset dir="src/main/resources" includes="**" />
+    </copy>
+  </target>
+  
+  <target name="jar" description="Jar this project" depends="compile">
+    <jar destfile="${ant.project.name}.jar">
+      <fileset dir="${connectors.classes.dir}" />
+      <manifest>
+          <attribute name="Built-By" value="${user.name}"/>
+         <!-- Information about the program itself -->
+         <attribute name="Implementation-Vendor" value="LucidWorks, Inc."/>
+         <attribute name="Specification-Title" value="Connectors"/>
+         <attribute name="Implementation-Title" value="Connectors, ${env.GIT_BRANCH} branch, ${env.JOB_NAME} build job #${env.BUILD_ID}"/>
+         <attribute name="Specification-Version" value="${env.GIT_BRANCH}"/>
+         <attribute name="Implementation-Version" value="${connectors.version}"/>
+       </manifest>
+    </jar>
+  </target>
+  
+  <target name="run-solr" description="Run interactive Solr">
+    <java dir="${solr.run.dir}" jar="${solr.run.dir}/start.jar" fork="true" failonerror="true" output="${solr.run.dir}/solr.log">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <jvmarg line="-Xmx${heap.size}"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
+      <sysproperty key="jetty.port" value="${solr.port}"/>
+      <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
+      <sysproperty key="STOP.KEY" value="srsly.stop"/>
+    </java>
+  </target>
+</project>
