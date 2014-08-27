@@ -74,6 +74,14 @@
     <delete dir="${lib.dir}" />
   </target>
   
+  <target name="clean-solr" description="Cleans solr/ directory with exception for solr/dist/">
+    <delete>
+      <fileset dir="${solr.dir}">
+        <exclude name="dist/**/*"/>
+      </fileset>
+    </delete>
+  </target>
+  
   <target name="init">
     <mkdir dir="${build.dir}" />
     <mkdir dir="${lib.dir}"/>
@@ -99,22 +107,95 @@
   </target>
   
   <target name="jar" description="Jar this project" depends="compile">
-    <jar destfile="${ant.project.name}.jar">
-      <fileset dir="${connectors.classes.dir}" />
+    <jar destfile="${build.dir}/${ant.project.name}-${solr.couchbase.plugin.version}.jar">
+      <fileset dir="${classes.dir}" />
       <manifest>
           <attribute name="Built-By" value="${user.name}"/>
          <!-- Information about the program itself -->
          <attribute name="Implementation-Vendor" value="LucidWorks, Inc."/>
-         <attribute name="Specification-Title" value="Connectors"/>
-         <attribute name="Implementation-Title" value="Connectors, ${env.GIT_BRANCH} branch, ${env.JOB_NAME} build job #${env.BUILD_ID}"/>
-         <attribute name="Specification-Version" value="${env.GIT_BRANCH}"/>
-         <attribute name="Implementation-Version" value="${connectors.version}"/>
+         <attribute name="Specification-Title" value="${ant.project.name}"/>
+         <attribute name="Implementation-Title" value="${ant.project.name}"/>
+         <attribute name="Implementation-Version" value="${solr.couchbase.plugin.version}"/>
        </manifest>
     </jar>
   </target>
   
-  <target name="run-solr" description="Run interactive Solr">
-    <java dir="${solr.run.dir}" jar="${solr.run.dir}/start.jar" fork="true" failonerror="true" output="${solr.run.dir}/solr.log">
+  <target name="solr-check">
+    <mkdir dir="${solr.dir}/dist" />
+    <available file="${solr.dir}/dist/solr-${solr.version}.zip" property="solrzip.exists"/>
+  </target>
+
+  <target name="get-solr" unless="solrzip.exists" depends="solr-check">
+    <get src="http://archive.apache.org/dist/lucene/solr/${solr.version}/solr-${solr.version}.zip"
+                dest="${solr.dir}/dist/solr-${solr.version}.zip"/>
+  </target>
+
+  <target name="prep-solr" depends="ivy-init, get-solr, jar" unless="solr.prep.skip">
+    <prep-solr solr.dir="${solr.dir}" solr.version="${solr.version}"/>
+  </target>
+  
+  <macrodef name="prep-solr">
+    <attribute name="solr.dir"/>
+    <attribute name="solr.version"/>
+    <sequential>
+      <echo>Unpacking Solr @{solr.version} into @{solr.dir} from module ${ant.project.name}</echo>
+
+      <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.dir}">
+        <patternset>
+          <include name="solr-@{solr.version}/example/contexts/**"/>
+          <include name="solr-@{solr.version}/example/**"/>
+          <include name="solr-@{solr.version}/example/etc/**"/>
+          <include name="solr-@{solr.version}/example/resources/**"/>
+          <include name="solr-@{solr.version}/example/solr/**"/>
+          <include name="solr-@{solr.version}/example/start.jar"/>
+        </patternset>
+        <mapper>
+          <globmapper from="solr-@{solr.version}/example/*" to="*"/>
+        </mapper>
+      </unzip>
+      
+      <mkdir dir="${solr.sharedlib.dir}"/>
+      <copy todir="${solr.sharedlib.dir}">
+        <fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>
+        <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+      </copy>
+    </sequential>
+  </macrodef>
+  
+  <target name="patch-solrconfig-check">
+    <echo message="checking ${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <available file="${solr.conf.overrides.dir}/solrconfig.xml.patch" property="solrconfig.xml.patch.exists"/>
+  </target>
+  
+  <target name="patch-solr-check">
+    <echo message="checking ${solr.conf.overrides.dir.dir}/solr.xml.patch"/>
+    <available file="${solr.conf.overrides.dir}/solr.xml.patch" property="solr.xml.patch.exists"/>
+  </target>
+
+  <target name="patch-solrconfig-xml" if="solrconfig.xml.patch.exists" depends="patch-solrconfig-check, prep-solr">
+    <exec executable="dos2unix">
+      <arg value="${solr.dir}/solr/collection1/conf/solrconfig.xml"/>
+    </exec>
+    <patch
+      patchfile="${solr.conf.overrides.dir}/solrconfig.xml.patch"
+      originalfile="${solr.dir}/solr/collection1/conf/solrconfig.xml"
+      ignorewhitespace="true"
+      failonerror="true" />
+  </target>
+  
+  <target name="patch-solr-xml" if="solr.xml.patch.exists" depends="patch-solr-check, prep-solr">
+    <exec executable="dos2unix">
+      <arg value="${solr.run.dir}/solr.xml"/>
+    </exec>
+    <patch
+      patchfile="${solr.conf.overrides.dir}/solr.xml.patch"
+      originalfile="${solr.run.dir}/solr.xml"
+      ignorewhitespace="true"
+      failonerror="true" />
+  </target>
+
+  <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr-xml, patch-solrconfig-xml">
+    <java dir="${solr.dir}" jar="${solr.dir}/start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>

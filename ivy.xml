@@ -37,6 +37,8 @@
     <dependency org="com.carrotsearch.randomizedtesting" name="randomizedtesting-runner" rev="2.1.6" conf="compile->default"/>
     <dependency org="com.carrotsearch.randomizedtesting" name="junit4-ant" rev="2.1.6" conf="compile->default"/>
     <dependency org="org.apache.ant" name="ant" rev="1.9.2" conf="test->default"/>
-    <dependency org="org.eclipse.jetty.orbit" name="javax.servlet" rev="3.0.0.v201112011016" conf="compile->default"/>
+    
+    <!-- exludes -->
+    <exclude org="org.eclipse.jetty.orbit"/>
   </dependencies>
 </ivy-module>

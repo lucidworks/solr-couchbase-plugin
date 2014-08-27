@@ -1,0 +1,10 @@
+--- solr.orig.xml	2014-05-14 19:40:34.000000000 -0700
++++ solr.xml	2014-08-27 14:00:49.470374283 -0700
+@@ -27,6 +27,7 @@
+ -->
+ 
+ <solr>
++  <str name="sharedLib">${sharedLib:lib-couchbase}</str>
+ 
+   <solrcloud>
+     <str name="host">${host:}</str>
