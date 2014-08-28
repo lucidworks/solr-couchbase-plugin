@@ -8,6 +8,9 @@ import java.util.Map;
 import com.couchbase.capi.CouchbaseBehavior;
 
 public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
+  
+  int port = 9876;
+  String bucketName = "solr-couchbae-plugin";
 
   public List<String> getPools() {
     List<String> result = new ArrayList<String>();
@@ -25,6 +28,9 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   
       Map<String, Object> responseMap = new HashMap<String, Object>();
       responseMap.put("buckets", bucket);
+      
+//      List<Object> nodes = getNodesServingPool(pool);
+//      responseMap.put("nodes", nodes);
   
       return responseMap;
   }
@@ -50,11 +56,14 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   
           Map<String, Object> nodePorts = new HashMap<String, Object>();
           nodePorts.put("direct", 8091);
+//          nodePorts.put("direct", port);
   
           Map<String, Object> node = new HashMap<String, Object>();
-          node.put("couchApiBase",
+//          node.put(bucketName,
+          node.put("couchAPpiBase",
                   String.format("http://%s/%s", "127.0.0.1", "default"));
           node.put("hostname", 8091);
+//          node.put("hostname", port);
           node.put("ports", nodePorts);
   
           nodes.add(node);

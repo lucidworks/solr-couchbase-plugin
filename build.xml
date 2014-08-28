@@ -61,6 +61,16 @@
     <ivy-resolve-conf conf="compile" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
     <property name="compile.resolved" value="true" />
   </target>
+  
+  <target name="ivy-resolve-jetty" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="runtime.resolved">
+    <ivy-resolve-conf conf="jetty" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
+    <property name="jetty.resolved" value="true" />
+  </target>
+  
+  <target name="ivy-resolve-runtime" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="runtime.resolved">
+    <ivy-resolve-conf conf="runtime" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
+    <property name="runtime.resolved" value="true" />
+  </target>
 
   <target name="ivy-report" depends="ivy-init" description="generate Ivy reports for all confs">
     <!--<fail message="apollo.version not set" unless="${apollo.version}"/>-->
@@ -78,6 +88,7 @@
     <delete>
       <fileset dir="${solr.dir}">
         <exclude name="dist/**/*"/>
+        <include name="**/*"/>
       </fileset>
     </delete>
   </target>
@@ -123,6 +134,7 @@
   <target name="solr-check">
     <mkdir dir="${solr.dir}/dist" />
     <available file="${solr.dir}/dist/solr-${solr.version}.zip" property="solrzip.exists"/>
+    <echo>solrzip.exists=${solrzip.exists}</echo>
   </target>
 
   <target name="get-solr" unless="solrzip.exists" depends="solr-check">
@@ -130,7 +142,7 @@
                 dest="${solr.dir}/dist/solr-${solr.version}.zip"/>
   </target>
 
-  <target name="prep-solr" depends="ivy-init, get-solr, jar" unless="solr.prep.skip">
+  <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-runtime" unless="solr.prep.skip">
     <prep-solr solr.dir="${solr.dir}" solr.version="${solr.version}"/>
   </target>
   
@@ -158,6 +170,8 @@
       <copy todir="${solr.sharedlib.dir}">
         <fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>
         <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+        <fileset dir="${lib.dir}/jetty" includes="*"/>
+        <fileset dir="${lib.dir}/runtime" includes="*"/>
       </copy>
     </sequential>
   </macrodef>
@@ -195,10 +209,12 @@
   </target>
 
   <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr-xml, patch-solrconfig-xml">
+    <delete dir="${solr.dir}/solr-webapp/webapp"/>
+
     <java dir="${solr.dir}" jar="${solr.dir}/start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
-      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
       <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>

@@ -17,7 +17,9 @@ public class CouchbaseRequestHandler extends RequestHandlerBase {
   CouchbaseBehavior couchbaseBehaviour;
   CAPIBehavior capiBehaviour;
   CAPIServer server;
-  int port = -1;
+  int port = 9876;
+  String username = "admin";
+  String password = "admin123";
   
   @Override
   public void init(NamedList args) {
@@ -54,7 +56,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase {
   public String getSource() { return null; }
 
   public void startCouchbasePlugin() {
-    server = new CAPIServer(capiBehaviour, couchbaseBehaviour, null, null);
+    server = new CAPIServer(capiBehaviour, couchbaseBehaviour, port, username, password);
     //TODO fix this
     try{
       server.start();

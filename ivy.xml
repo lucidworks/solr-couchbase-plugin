@@ -6,6 +6,7 @@
     <conf name="compile"/>
     <conf name="test" extends="compile"/>
     <conf name="jetty" visibility="private"/>
+    <conf name="runtime" visibility="private"/>
   </configurations>
 
   <dependencies>
@@ -32,6 +33,8 @@
     <dependency org="org.eclipse.jetty" name="jetty-servlets" rev="${jetty.version2}" conf="test->default;jetty->default"/>
     <dependency org="javax.servlet" name="javax.servlet-api" rev="3.1.0" conf="compile->default"/>
     <dependency org="org.mortbay.jetty" name="jetty-runner" rev="${jetty.runner.version}" conf="jetty->master"/>
+    
+    <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="runtime->default"/>
     
     <dependency org="org.apache.lucene" name="lucene-test-framework" rev="${solr.version}" conf="test->master"/>
     <dependency org="com.carrotsearch.randomizedtesting" name="randomizedtesting-runner" rev="2.1.6" conf="compile->default"/>
