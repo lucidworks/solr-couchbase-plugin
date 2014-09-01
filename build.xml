@@ -168,10 +168,31 @@
       
       <mkdir dir="${solr.sharedlib.dir}"/>
       <copy todir="${solr.sharedlib.dir}">
-        <fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>
+        <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
         <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
         <fileset dir="${lib.dir}/jetty" includes="*"/>
         <fileset dir="${lib.dir}/runtime" includes="*"/>
+      </copy>
+      
+      <delete dir="${solr.dir}/solr-war"/>
+      <mkdir dir="${solr.dir}/solr-war"/>
+      <unwar src="${solr.dir}/webapps/solr.war" dest="${solr.dir}/solr-war">
+        <patternset>
+          <include name="**/*"/>
+        </patternset>
+      </unwar>
+      <delete file="${solr.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>
+      <copy todir="${solr.dir}/solr-war/WEB-INF/lib">
+        <fileset dir="${lib.dir}/runtime" includes="commons-io-2.4.jar"/>
+      </copy>
+      <war destfile="${solr.dir}/solr-war/solr.war" webxml="${solr.dir}/solr-war/WEB-INF/web.xml">
+        <fileset dir="${solr.dir}/solr-war">
+          <include name="**/*" />
+        </fileset>
+      </war>
+      <delete file="${solr.dir}/webapps/solr.war" />
+      <copy todir="${solr.dir}/webapps">
+        <fileset file="${solr.dir}/solr-war/solr.war"/>
       </copy>
     </sequential>
   </macrodef>

@@ -1,5 +1,6 @@
 package com.lucidworks.couchbase;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,10 +8,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.codec.binary.Base64;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.couchbase.capi.CAPIBehavior;
 
 public class SolrCAPIBehaviour implements CAPIBehavior {
+  
+  private static final Logger LOG = LoggerFactory.getLogger(SolrCAPIBehaviour.class);
+  
+  protected ObjectMapper mapper = new ObjectMapper();
+  private TypeSelector typeSelector;
+  protected Map<String, String> documentTypeParentFields;
+  protected Map<String, String> documentTypeRoutingFields;
 
+  public SolrCAPIBehaviour(TypeSelector typeSelector, Map<String, String> documentTypeParentFields, Map<String, String> documentTypeRoutingFields) {
+    this.typeSelector = typeSelector;
+    this.documentTypeParentFields = documentTypeParentFields;
+    this.documentTypeRoutingFields = documentTypeRoutingFields;
+  }
+  
   public Map<String, Object> welcome() {
     Map<String,Object> responseMap = new HashMap<String, Object>();
     responseMap.put("welcome", "solr-couchbase-plugin");
@@ -18,20 +37,38 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   }
   
   public String databaseExists(String database) {
-      if("default".equals(database)) {
-          return null;
-      }
-      return "missing";
+    String index = getElasticSearchIndexNameFromDatabase(database);
+    if("default".equals(index)) {
+        return null;
+    }
+    return "missing";
+  }
+  
+  protected String getElasticSearchIndexNameFromDatabase(String database) {
+    String[] pieces = database.split("/", 2);
+    if(pieces.length < 2) {
+        return database;
+    } else {
+        return pieces[0];
+    }
   }
   
   public Map<String, Object> getDatabaseDetails(String database) {
       String doesNotExistReason = databaseExists(database);
       if(doesNotExistReason == null) {
           Map<String, Object> responseMap = new HashMap<String, Object>();
-          responseMap.put("db_name", database);
+          responseMap.put("db_name", getDatabaseNameWithoutUUID(database));
           return responseMap;
       }
       return null;
+  }
+  
+  protected String getDatabaseNameWithoutUUID(String database) {
+    int semicolonIndex = database.indexOf(';');
+    if(semicolonIndex >= 0) {
+        return database.substring(0, semicolonIndex);
+    }
+    return database;
   }
   
   public boolean createDatabase(String database) {
@@ -53,7 +90,8 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   public Map<String, Object> revsDiff(String database,
           Map<String, Object> revsMap) {
-      if("default".equals(database)) {
+      String index = getElasticSearchIndexNameFromDatabase(database);
+      if("default".equals(index)) {
           Map<String, Object> responseMap = new HashMap<String, Object>();
           for (Entry<String, Object> entry : revsMap.entrySet()) {
               String id = entry.getKey();
@@ -68,20 +106,105 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   }
   
   public List<Object> bulkDocs(String database, List<Map<String, Object>> docs) {
-  
-      if("default".equals(database)) {
+
+      String index = getElasticSearchIndexNameFromDatabase(database);
+      
+      // keep a map of the id - rev for building the response
+      Map<String,String> revisions = new HashMap<String, String>();
+      
+      // put requests into this map, not directly into the bulk request
+//      Map<String,IndexRequest> bulkIndexRequests = new HashMap<String,IndexRequest>();
+//      Map<String,DeleteRequest> bulkDeleteRequests = new HashMap<String,DeleteRequest>();
+      
+      if("default".equals(index)) {
   
           List<Object> result = new ArrayList<Object>();
   
           for (Map<String, Object> doc : docs) {
   
-              String id = (String)doc.get("_id");
-              String rev = (String)doc.get("_rev");
-  
-              Map<String, Object> itemResponse = new HashMap<String, Object>();
-              itemResponse.put("id", id);
-              itemResponse.put("rev", rev);
-              result.add(itemResponse);
+            // these are the top-level elements that could be in the document sent by Couchbase
+            Map<String, Object> meta = (Map<String, Object>)doc.get("meta");
+            Map<String, Object> json = (Map<String, Object>)doc.get("json");
+            String base64 = (String)doc.get("base64");
+            
+            if(meta == null) {
+              // if there is no meta-data section, there is nothing we can do
+              LOG.warn("Document without meta in bulk_docs, ignoring....");
+              continue;
+            } else if("non-JSON mode".equals(meta.get("att_reason"))) {
+                // optimization, this tells us the body isn't json
+                json = new HashMap<String, Object>();
+            } else if(json == null && base64 != null) {
+                byte[] decodedData = Base64.decodeBase64(base64);
+                try {
+                    // now try to parse the decoded data as json
+                    json = (Map<String, Object>) mapper.readValue(decodedData, Map.class);
+                }
+                catch(IOException e) {
+                    LOG.error("Unable to parse decoded base64 data as JSON, indexing stub for id: {}", meta.get("id"));
+                    LOG.error("Body was: {} Parse error was: {}", new String(decodedData), e);
+                    json = new HashMap<String, Object>();
+ 
+                }
+            }
+            
+            // at this point we know we have the document meta-data
+            // and the document contents to be indexed are in json
+
+            Map<String, Object> toBeIndexed = new HashMap<String, Object>();
+            toBeIndexed.put("meta", meta);
+            toBeIndexed.put("doc", json);
+
+            String id = (String)meta.get("id");
+            String rev = (String)meta.get("rev");
+            revisions.put(id, rev);
+
+            long ttl = 0;
+            Integer expiration = (Integer)meta.get("expiration");
+            if(expiration != null) {
+                ttl = (expiration.longValue() * 1000) - System.currentTimeMillis();
+            }
+            
+            
+            String parentField = null;
+            String routingField = null;
+            String type = typeSelector.getType(index, id);
+            if(documentTypeParentFields != null && documentTypeParentFields.containsKey(type)) {
+                parentField = documentTypeParentFields.get(type);
+            }
+            if(documentTypeRoutingFields != null && documentTypeRoutingFields.containsKey(type)) {
+                routingField = documentTypeRoutingFields.get(type);
+            }
+            boolean deleted = meta.containsKey("deleted") ? (Boolean)meta.get("deleted") : false;
+
+            if(deleted) {
+                //TODO Solr delete request
+//                bulkDeleteRequests.put(id, deleteRequest);
+            } else {
+//              IndexRequestBuilder indexBuilder = client.prepareIndex(index, type, id);
+//              indexBuilder.setSource(toBeIndexed);
+              if(ttl > 0) {
+//                  indexBuilder.setTTL(ttl);
+              }
+              if(parentField != null) {
+                  Object parent = JSONMapPath(toBeIndexed, parentField);
+                  if (parent != null && parent instanceof String ) {
+//                      indexBuilder.setParent((String)parent);
+                  } else {
+                      LOG.warn("Unabled to determine parent value from parent field {} for doc id {}", parentField, id);
+                  }
+              }
+              if(routingField != null) {
+                  Object routing = JSONMapPath(toBeIndexed, routingField);
+                  if (routing != null && routing instanceof String) {
+//                      indexBuilder.setRouting((String)routing);
+                  } else {
+                      LOG.warn("Unable to determine routing value from routing field {} for doc id {}", routingField, id);
+                  }
+              }
+//              IndexRequest indexRequest = indexBuilder.request();
+//              bulkIndexRequests.put(id,  indexRequest);
+          }
           }
   
           //TODO index documents to Solr here
@@ -192,6 +315,26 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
           return "00000000000000000000000000000000";
       }
       return null;
+  }
+  
+  public Object JSONMapPath(Map<String, Object> json, String path) {
+    int dotIndex = path.indexOf('.');
+    if (dotIndex >= 0) {
+        String pathThisLevel = path.substring(0,dotIndex);
+        Object current = json.get(pathThisLevel);
+        String pathRest = path.substring(dotIndex+1);
+        if (pathRest.length() == 0) {
+            return current;
+        }
+        else if(current instanceof Map && pathRest.length() > 0) {
+            return JSONMapPath((Map<String, Object>)current, pathRest);
+        }
+    } else {
+        // no dot
+        Object current = json.get(path);
+        return current;
+    }
+    return null;
   }
 
 }
