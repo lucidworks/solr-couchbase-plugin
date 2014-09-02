@@ -142,17 +142,20 @@
                 dest="${solr.dir}/dist/solr-${solr.version}.zip"/>
   </target>
 
+  <available file="${solr.app.dir}" type="dir" property="solr.prep.skip" />
+  
   <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-runtime" unless="solr.prep.skip">
-    <prep-solr solr.dir="${solr.dir}" solr.version="${solr.version}"/>
+    <prep-solr solr.unpack.dir="${solr.app.dir}" solr.version="${solr.version}"/>
   </target>
   
   <macrodef name="prep-solr">
-    <attribute name="solr.dir"/>
+    <attribute name="solr.unpack.dir"/>
     <attribute name="solr.version"/>
     <sequential>
       <echo>Unpacking Solr @{solr.version} into @{solr.dir} from module ${ant.project.name}</echo>
 
-      <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.dir}">
+      <mkdir dir="@{solr.unpack.dir}"/>
+      <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.unpack.dir}">
         <patternset>
           <include name="solr-@{solr.version}/example/contexts/**"/>
           <include name="solr-@{solr.version}/example/**"/>
@@ -176,7 +179,7 @@
       
       <delete dir="${solr.dir}/solr-war"/>
       <mkdir dir="${solr.dir}/solr-war"/>
-      <unwar src="${solr.dir}/webapps/solr.war" dest="${solr.dir}/solr-war">
+      <unwar src="@{solr.unpack.dir}/webapps/solr.war" dest="${solr.dir}/solr-war">
         <patternset>
           <include name="**/*"/>
         </patternset>
@@ -190,8 +193,8 @@
           <include name="**/*" />
         </fileset>
       </war>
-      <delete file="${solr.dir}/webapps/solr.war" />
-      <copy todir="${solr.dir}/webapps">
+      <delete file="@{solr.unpack.dir}/webapps/solr.war" />
+      <copy todir="@{solr.unpack.dir}/webapps">
         <fileset file="${solr.dir}/solr-war/solr.war"/>
       </copy>
     </sequential>
@@ -209,11 +212,11 @@
 
   <target name="patch-solrconfig-xml" if="solrconfig.xml.patch.exists" depends="patch-solrconfig-check, prep-solr">
     <exec executable="dos2unix">
-      <arg value="${solr.dir}/solr/collection1/conf/solrconfig.xml"/>
+      <arg value="${solr.app.dir}/solr/collection1/conf/solrconfig.xml"/>
     </exec>
     <patch
       patchfile="${solr.conf.overrides.dir}/solrconfig.xml.patch"
-      originalfile="${solr.dir}/solr/collection1/conf/solrconfig.xml"
+      originalfile="${solr.app.dir}/solr/collection1/conf/solrconfig.xml"
       ignorewhitespace="true"
       failonerror="true" />
   </target>
@@ -230,9 +233,9 @@
   </target>
 
   <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr-xml, patch-solrconfig-xml">
-    <delete dir="${solr.dir}/solr-webapp/webapp"/>
+    <delete dir="${solr.app.dir}/solr-webapp/webapp"/>
 
-    <java dir="${solr.dir}" jar="${solr.dir}/start.jar" fork="true" failonerror="true">
+    <java dir="${solr.app.dir}" jar="${solr.app.dir}/start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
