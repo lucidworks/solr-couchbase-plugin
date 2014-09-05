@@ -8,19 +8,28 @@ This plugin allows to import CouchBase data to Solr. It uses the Cross-datacente
 
 ## Dependencies
 
-* Copy the dependencies provided with this plugin to the directory **<solr_home>/solr/lib-couchbase**.
-* Replace the *commons-io* dependency in solr.war file to the 2.4 version. It is located under <solr-war>/WEB-INF/lib/ path.
+* Copy the dependencies provided with this plugin to the directory:
+```
+<solr_home>/solr/lib-couchbase/
+```
+* Replace the *commons-io* dependency in solr.war file to the 2.4 version. It is located under:
+```
+<solr-war>/WEB-INF/lib/
+```
 
 
 ## solr.xml
 
 An additional line to solr.xml should be added, to inform Solr about new dependencies which should be included in the Solr's classpath. Add the following line to solr.xml file:
 
-`<str name="sharedLib">${sharedLib:lib-couchbase}</str>`
+```
+<str name="sharedLib">${sharedLib:lib-couchbase}</str>
+```
 
 The whole solr.xml file should look as follows:
 
-`<solr>
+```
+<solr>
   <str name="sharedLib">${sharedLib:lib-couchbase}</str>
 
   <solrcloud>
@@ -37,36 +46,39 @@ The whole solr.xml file should look as follows:
     <int name="connTimeout">${connTimeout:0}</int>
   </shardHandlerFactory>
 
-</solr>`
+</solr>
+```
 
 
 ## solrconfig.xml
 
 It is required to configure Couchbase buckets to index data from in the solrconfig.xml file under */couchbase* RequestHandler. Whole RequestHandler configuration should look as following:
 
-`<requestHandler name="/couchbase" class="com.lucidworks.couchbase.CouchbaseRequestHandler">
-    <lst name="params">
-      <str name="username">admin</str>
-      <str name="password">admin123</str>
-      <int name="port">9876</int>
-      <bool name="commitAfterBatch">false</bool>
-      <bool name="optimize">false</bool>
-    </lst>
-    <lst name="databases">
-      <str name="beer">beer-sample</str>
-      <str name="default">default</str>
-      <str name="test">test</str>
-    </lst>`
-    <lst name="test-fieldmappings">
-      <str name="person">person:/person</str>
-      <str name="name">name:/person/name</str>
-      <str name="age">age_i:/person/age</str>
-      <str name="value">value_i:/value</str>
-    </lst>
-    <lst name="test-splitpath">
-      <str name="test-splitpath">/person|/person/name|/person/age|/value</str>
-    </lst>
-</requestHandler>`
+```
+<requestHandler name="/couchbase" class="com.lucidworks.couchbase.CouchbaseRequestHandler">
+  <lst name="params">
+    <str name="username">admin</str>
+    <str name="password">admin123</str>
+    <int name="port">9876</int>
+    <bool name="commitAfterBatch">false</bool>
+    <bool name="optimize">false</bool>
+  </lst>
+  <lst name="databases">
+    <str name="beer">beer-sample</str>
+    <str name="default">default</str>
+    <str name="test">test</str>
+  </lst>`
+  <lst name="test-fieldmappings">
+    <str name="person">person:/person</str>
+    <str name="name">name:/person/name</str>
+    <str name="age">age_i:/person/age</str>
+    <str name="value">value_i:/value</str>
+  </lst>
+  <lst name="test-splitpath">
+    <str name="test-splitpath">/person|/person/name|/person/age|/value</str>
+  </lst>
+</requestHandler>
+```
 
 * params - a list of params required to configure this plugin.
   - username - A valid Couchbase server username
@@ -76,35 +88,43 @@ It is required to configure Couchbase buckets to index data from in the solrconf
   - optimize - Optimize parameter for Solr's commit request.
   
 * databases - a list with names of all bucket names that will be indexed from Couchbase. Only the value of the list element is significant. The name of the element must be unique. Example:
-`<lst name="databases">
-      <str name="beer">beer-sample</str>
-      <str name="default">default</str>
-      <str name="gamesim-sample">gamesim-sample</str>
- </lst>`
-    
+```
+<lst name="databases">
+  <str name="beer">beer-sample</str>
+  <str name="default">default</str>
+  <str name="gamesim-sample">gamesim-sample</str>
+</lst>
+```    
 * field mappings - a list with field names mapping for Couchbase documents, before indexing them into Solr. The name of the list must end with suffix *-fieldmapping*. List element's name must be unique. Value should be <solr_field_name>:<couchbase_field_path>. The `*couchbase_field_path*` is a path to the field in this JSON. Example:
 
-`Example JSON
+Example JSON
+```
 {
-  "person" : { "name" : "John",
-               "age" : 22
-             },
-  "value" : 100
+"person" : { 
+            "name" : "John",
+            "age" : 22
+           },
+"value" : 100
 }
+```
 
 Example field mappings:
+```
 <lst name="test-fieldmappings">
-      <str name="person">person:/person</str>
-      <str name="name">name:/person/name</str>
-      <str name="age">age_i:/person/age</str>
-      <str name="value">value_i:/value</str>
-</lst>`
+  <str name="person">person:/person</str>
+  <str name="name">name:/person/name</str>
+  <str name="age">age_i:/person/age</str>
+  <str name="value">value_i:/value</str>
+</lst>
+```
 
 * splitpaths - a list with paths to the fields which will be extracted from Couchbase JSON document. This is a single String where paths are saparated with "|". Example:
 
-`<lst name="test-splitpath">
-      <str name="test-splitpath">/person|/person/name|/person/age|/value</str>
- </lst>`
+```
+<lst name="test-splitpath">
+  <str name="test-splitpath">/person|/person/name|/person/age|/value</str>
+</lst>
+ ```
 
 
 ## Couchbase XDCR
@@ -120,6 +140,8 @@ In Couchbase admin panel, under XDCR tab following settings should be configured
 
 To run this plugin, simply perform all actions described in Configuration section of this instruction, and run Solr. When solr is started execute GET request to URL
 
-`http://<solr_address>/collection1/couchbase?q=start`
+```
+http://<solr_address>/collection1/couchbase?q=start
+```
 
 This will start the plugin, which will register in Couchbase as its replica and the data synchronisation as well as indexing into Solr should start. 
