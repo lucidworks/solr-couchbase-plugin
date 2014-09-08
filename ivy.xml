@@ -20,6 +20,7 @@
     </dependency>
     <dependency org="org.apache.solr" name="solr-uima" rev="${solr.version}" conf="compile->default"/>
     <dependency org="org.apache.solr" name="solr-velocity" rev="${solr.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-solrj" rev="4.10.0" conf="compile->default;runtime->default"/>
     <!-- jetty -->
     <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="${jetty.version}" conf="compile->default;jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="${jetty.servlet.version}" conf="compile->default;jetty->default"/>
@@ -39,6 +40,8 @@
     <dependency org="commons-codec" name="commons-codec" rev="1.6" conf="compile->default"/>
     <!-- jackson-mapper-asl -->
     <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="compile->default"/>
+    <!-- noggit -->
+    <dependency org="org.noggit" name="noggit" rev="0.6" conf="compile->default"/>
     
     <!-- other -->
     <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="runtime->default"/>

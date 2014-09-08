@@ -144,7 +144,7 @@
 
   <available file="${solr.app.dir}" type="dir" property="solr.prep.skip" />
   
-  <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-runtime" unless="solr.prep.skip">
+  <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-runtime" >
     <prep-solr solr.unpack.dir="${solr.app.dir}" solr.version="${solr.version}"/>
   </target>
   
@@ -201,13 +201,13 @@
   </macrodef>
   
   <target name="patch-solrconfig-check">
-    <echo message="checking ${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
     <available file="${solr.conf.overrides.dir}/solrconfig.xml.patch" property="solrconfig.xml.patch.exists"/>
+    <echo message="checking ${solr.conf.overrides.dir}/solrconfig.xml.patch -> ${solrconfig.xml.patch.exists}"/>
   </target>
   
   <target name="patch-solr-check">
-    <echo message="checking ${solr.conf.overrides.dir.dir}/solr.xml.patch"/>
     <available file="${solr.conf.overrides.dir}/solr.xml.patch" property="solr.xml.patch.exists"/>
+    <echo message="checking ${solr.conf.overrides.dir}/solr.xml.patch -> ${solr.xml.patch.exists}"/>
   </target>
 
   <target name="patch-solrconfig-xml" if="solrconfig.xml.patch.exists" depends="patch-solrconfig-check, prep-solr">
@@ -231,14 +231,17 @@
       ignorewhitespace="true"
       failonerror="true" />
   </target>
+  
+  <target name="patch-solr" depends="patch-solr-xml, patch-solrconfig-xml">
+  </target>
 
-  <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr-xml, patch-solrconfig-xml">
+  <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr">
     <delete dir="${solr.app.dir}/solr-webapp/webapp"/>
 
     <java dir="${solr.app.dir}" jar="${solr.app.dir}/start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
-      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
       <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
