@@ -1,6 +1,6 @@
 --- solrconfig.orig.xml	2014-05-14 19:40:34.000000000 -0700
 +++ solrconfig.xml	2014-08-27 14:02:32.046369709 -0700
-@@ -1868,4 +1868,29 @@
+@@ -1868,4 +1868,41 @@
      <defaultQuery>*:*</defaultQuery>
    </admin>
  
@@ -26,6 +26,18 @@
 +        <str name="description">description:/description</str>
 +        <str name="address">address_s:/address</str>
 +        <str name="geo">geo_s:/geo</str>
++      </lst>
++    </lst>
++    <lst name="bucket">
++      <str name="name">test</str>
++      <str name="splitpath">/exams</str>
++      <lst name="fieldmappings">
++        <str name="first">first_s:/first</str>
++        <str name="last">last_s:/last</str>
++        <str name="grade">grade_i:/grade</str>
++        <str name="subject">subject_s:/exams/subject</str>
++        <str name="test">test_s:/exams/test</str>
++        <str name="marks">marks_i:/exams/marks</str>
 +      </lst>
 +    </lst>
 +  </requestHandler>

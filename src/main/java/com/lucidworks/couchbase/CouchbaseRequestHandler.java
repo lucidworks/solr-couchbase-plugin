@@ -27,21 +27,10 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
   
-  public static final String HANDLER_PARAMS = "params";
-  public static final String BUCKET_MARK = "bucket";
-  public static final String FIELD_MAPPING_FIELD = "fieldmappings";
-  public static final String SPLITPATH_FIELD = "splitpath";
-  public static final String USERNAME_FIELD = "username";
-  public static final String PASSWORD_FIELD = "password";
-  public static final String PORT_FIELD = "port";
-  public static final String NAME_FIELD = "name";
-  public static final String COMMIT_AFTER_BATCH_FIELD = "name";
-  /** Select the update processor chain to use.  A RequestHandler may or may not respect this parameter */
-  public static final String UPDATE_CHAIN = "update.chain";
-  
   CouchbaseBehavior couchbaseBehaviour;
   CAPIBehavior capiBehaviour;
   CAPIServer server;
+  private String host = "127.0.0.1";
   private int port;
   private String username;
   private String password;
@@ -86,17 +75,17 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   @Override
   public void init(NamedList args) {
     super.init(args);
-    Map<String,String> params = SolrParams.toMap((NamedList<String>)args.get(HANDLER_PARAMS));
-    username = params.get(USERNAME_FIELD);
-    password = params.get(PASSWORD_FIELD);
-    port = Integer.parseInt(params.get(PORT_FIELD));
-    boolean commitAfterBatch = Boolean.parseBoolean(params.get(COMMIT_AFTER_BATCH_FIELD));
+    Map<String,String> params = SolrParams.toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
+    username = params.get(CommonConstants.USERNAME_FIELD);
+    password = params.get(CommonConstants.PASSWORD_FIELD);
+    port = Integer.parseInt(params.get(CommonConstants.PORT_FIELD));
+    boolean commitAfterBatch = Boolean.parseBoolean(params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD));
     
-    List<NamedList<Object>> bucketslist = args.getAll(BUCKET_MARK);
+    List<NamedList<Object>> bucketslist = args.getAll(CommonConstants.BUCKET_MARK);
     for(NamedList<Object> bucket : bucketslist) {
-      String name = (String)bucket.get(NAME_FIELD);
-      String splitpath = (String)bucket.get(SPLITPATH_FIELD);
-      NamedList<Object> mappingslist = (NamedList<Object>) bucket.get(FIELD_MAPPING_FIELD);
+      String name = (String)bucket.get(CommonConstants.NAME_FIELD);
+      String splitpath = (String)bucket.get(CommonConstants.SPLITPATH_FIELD);
+      NamedList<Object> mappingslist = (NamedList<Object>) bucket.get(CommonConstants.FIELD_MAPPING_FIELD);
       Map<String,String> fieldmappings = SolrParams.toMap(mappingslist);
       Bucket b = new Bucket(name, splitpath, fieldmappings);
       buckets.put(name, b);
@@ -116,7 +105,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
     typeSelector = new DefaultTypeSelector();
     typeSelector.configure(settings);
-    couchbaseBehaviour = new SolrCouchbaseBehaviour();
+    couchbaseBehaviour = new SolrCouchbaseBehaviour(this);
     capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
     
   }
@@ -157,7 +146,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       
     }
     port = server.getPort();
-//    LOG.info(String.format("CAPIServer started on port %d", port));
+    LOG.info(String.format("CAPIServer started on port %d", port));
   }
   
   public void stopCouchbasePlugin() {
@@ -176,7 +165,27 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     return this.core;
   }
   
+  public Map<String,Bucket> getBuckets() {
+    return buckets;
+  }
+  
   public Bucket getBucket(String name) {
     return buckets.get(name);
+  }
+  
+  public String getHost() {
+    return host;
+  }
+
+  public int getPort() {
+    return port;
+  }
+
+  public String getUsername() {
+    return username;
+  }
+
+  public String getPassword() {
+    return password;
   }
 }

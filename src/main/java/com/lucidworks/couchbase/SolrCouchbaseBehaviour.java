@@ -8,11 +8,13 @@ import java.util.Map;
 import com.couchbase.capi.CouchbaseBehavior;
 
 public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
-  
-  String host = "127.0.0.1";
-  int port = 9876;
-  String bucketName = "solr-couchbase-plugin";
 
+  CouchbaseRequestHandler handler;
+  
+  public SolrCouchbaseBehaviour(CouchbaseRequestHandler handler) {
+    this.handler = handler;
+  }
+  
   public List<String> getPools() {
     List<String> result = new ArrayList<String>();
     result.add("default");
@@ -37,14 +39,11 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   }
   
   public List<String> getBucketsInPool(String pool) {
-      List<String> bucketNameList = new ArrayList<String>();
-      bucketNameList.add("default");
-  
-      return bucketNameList;
+      return new ArrayList<String>(handler.getBuckets().keySet());
   }
   
   public String getBucketUUID(String pool, String bucket) {
-      if("default".equals(bucket)) {
+      if(handler.getBucket(bucket) != null) {
           return "00000000000000000000000000000000";
       }
       return null;
@@ -56,29 +55,15 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
           nodes = new ArrayList<Object>();
   
           Map<String, Object> nodePorts = new HashMap<String, Object>();
-//          nodePorts.put("direct", 8091);
-          nodePorts.put("direct", port);
+          nodePorts.put("direct", handler.getPort());
   
           Map<String, Object> node = new HashMap<String, Object>();
-//          node.put(bucketName,
           node.put("couchApiBase",
-                  String.format("http://%s:%s/", host, port));
-//          node.put("hostname", 8091);
-          node.put("hostname", host + ":" + port);
+                  String.format("http://%s:%s/", handler.getHost(), handler.getPort()));
+          node.put("hostname", handler.getHost() + ":" + handler.getPort());
           node.put("ports", nodePorts);
   
           nodes.add(node);
-  
-//          Map<String, Object> nodePorts2 = new HashMap<String, Object>();
-//          nodePorts2.put("direct", 8091);
-//  
-//          Map<String, Object> node2 = new HashMap<String, Object>();
-//          node2.put("couchApiBase",
-//                  String.format("http://%s/%s", "127.0.0.2", "default"));
-//          node2.put("hostname", 8091);
-//          node2.put("ports", nodePorts2);
-//  
-//          nodes.add(node2);
       }
   
       return nodes;

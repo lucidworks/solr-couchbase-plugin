@@ -19,6 +19,7 @@ public class CouchbaseRecordHandler implements Handler{
   SolrCAPIBehaviour capiBehaviour;
   SolrInputDocument doc;
   SolrQueryRequest req;
+  int seq = 1;
   
   public CouchbaseRecordHandler(SolrCAPIBehaviour capiBehaviour, SolrQueryRequest req, SolrInputDocument doc) {
     this.capiBehaviour = capiBehaviour;
@@ -28,6 +29,11 @@ public class CouchbaseRecordHandler implements Handler{
   
   @Override
   public void handle(Map<String, Object> record, String path) {
+    SolrInputDocument solrDoc = doc.deepCopy();
+    if(!path.equals("/")) {
+      solrDoc.setField(CommonConstants.ID_FIELD, (String)doc.getFieldValue(CommonConstants.ID_FIELD) + "-" + seq);
+      seq++;
+    }
     for(Map.Entry<String, Object> entry : record.entrySet()) {
       if(entry.getKey().equals("last_modified")) {
         DateFormat formatter = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss");
@@ -37,15 +43,15 @@ public class CouchbaseRecordHandler implements Handler{
         } catch (ParseException e) {
           LOG.error("Solr Couchbase plugin could not parse date", e);
         }
-        doc.setField(entry.getKey(), date);
+        solrDoc.setField(entry.getKey(), date);
       } else {
-        doc.addField(entry.getKey(), entry.getValue());
+        solrDoc.addField(entry.getKey(), entry.getValue());
       }
     }
-    if((boolean)doc.getFieldValue(SolrCAPIBehaviour.DELETED_FIELD)) {
-      capiBehaviour.deleteDoc(doc.getFieldValue(SolrCAPIBehaviour.ID_FIELD), req);
+    if((boolean)doc.getFieldValue(CommonConstants.DELETED_FIELD)) {
+      capiBehaviour.deleteDoc(solrDoc.getFieldValue(CommonConstants.ID_FIELD), req);
     } else {
-      capiBehaviour.addDoc(doc, req);
+      capiBehaviour.addDoc(solrDoc, req);
     }
   }
 

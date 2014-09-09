@@ -3,7 +3,6 @@ package com.lucidworks.couchbase;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -30,15 +29,6 @@ import com.couchbase.capi.CAPIBehavior;
 public class SolrCAPIBehaviour implements CAPIBehavior {
   
   private static final Logger LOG = LoggerFactory.getLogger(SolrCAPIBehaviour.class);
-  public static final String ID_FIELD = "id";
-  private static final String REVISION_FIELD = "revision_s";
-  private static final String JSON_FIELD = "content";
-  private static final String METADATA_FIELD = "metadata_s";
-  private static final String TTL_FIELD = "ttl_l";
-  public static final String DELETED_FIELD = "deleted_b";
-  public static final String PARENT_FIELD = "parent_s";
-  public static final String ROUTING_FIELD = "routing_s";
-  
   
   protected ObjectMapper mapper = new ObjectMapper();
   private TypeSelector typeSelector;
@@ -62,14 +52,14 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   }
   
   public String databaseExists(String database) {
-    String index = getElasticSearchIndexNameFromDatabase(database);
-    if("default".equals(index)) {
+    String bucketName = getBucketNameFromDatabase(database);
+    if(handler.getBucket(bucketName) != null) {
         return null;
     }
     return "missing";
   }
   
-  protected String getElasticSearchIndexNameFromDatabase(String database) {
+  protected String getBucketNameFromDatabase(String database) {
     String[] pieces = database.split("/", 2);
     if(pieces.length < 2) {
         return database;
@@ -115,8 +105,8 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   public Map<String, Object> revsDiff(String database,
           Map<String, Object> revsMap) {
-      String index = getElasticSearchIndexNameFromDatabase(database);
-      if("default".equals(index)) {
+      String bucketName = getBucketNameFromDatabase(database);
+      if(handler.getBucket(bucketName) != null) {
           Map<String, Object> responseMap = new HashMap<String, Object>();
           for (Entry<String, Object> entry : revsMap.entrySet()) {
               String id = entry.getKey();
@@ -132,7 +122,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   public List<Object> bulkDocs(String database, List<Map<String, Object>> docs) {
 
-      String index = getElasticSearchIndexNameFromDatabase(database);
+      String bucketName = getBucketNameFromDatabase(database);
       SolrQueryRequest req = new SolrQueryRequestBase(handler.getCore(), new SolrParams() {
         
         @Override
@@ -156,7 +146,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
       // keep a map of the id - rev for building the response
       Map<String,String> revisions = new HashMap<String, String>();
       
-      if(handler.getBucket(index) != null) {
+      if(handler.getBucket(bucketName) != null) {
   
           List<Object> result = new ArrayList<Object>();
   
@@ -177,12 +167,12 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
                 jsonMap = new HashMap<String, Object>();
             } else if(jsonMap == null && base64 != null) {
                 byte[] decodedData = Base64.decodeBase64(base64);
-                jsonString = new String(decodedData);
                 try {
-                    // now try to parse the decoded data as json
-                    jsonMap = (Map<String, Object>) mapper.readValue(decodedData, Map.class);
+                  jsonString = new String(decodedData, "UTF-8");
+                  // now try to parse the decoded data as json
+                  jsonMap = (Map<String, Object>) mapper.readValue(decodedData, Map.class);
                 }
-                catch(IOException e) {
+                catch(Exception e) {
                     LOG.error("Unable to parse decoded base64 data as JSON, indexing stub for id: {}", meta.get("id"));
                     LOG.error("Body was: {} Parse error was: {}", new String(decodedData), e);
                     jsonMap = new HashMap<String, Object>();
@@ -197,10 +187,10 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
             String rev = (String)meta.get("rev");
             revisions.put(id, rev);
             SolrInputDocument solrDoc = new SolrInputDocument();
-            solrDoc.addField(ID_FIELD, id);
-            solrDoc.addField(REVISION_FIELD, rev);
-            solrDoc.addField(JSON_FIELD, jsonString);
-            solrDoc.addField(METADATA_FIELD, meta);
+            solrDoc.addField(CommonConstants.ID_FIELD, id);
+            solrDoc.addField(CommonConstants.REVISION_FIELD, rev);
+            solrDoc.addField(CommonConstants.JSON_FIELD, jsonString);
+            solrDoc.addField(CommonConstants.METADATA_FIELD, meta);
             
             Map<String, Object> toBeIndexed = new HashMap<String, Object>();
             toBeIndexed.put("meta", meta);
@@ -212,16 +202,16 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
                 ttl = (expiration.longValue() * 1000) - System.currentTimeMillis();
             }
             if(ttl > 0) {
-              solrDoc.addField(TTL_FIELD, ttl);
+              solrDoc.addField(CommonConstants.TTL_FIELD, ttl);
             }
             
             boolean deleted = meta.containsKey("deleted") ? (Boolean)meta.get("deleted") : false;
-            solrDoc.addField(DELETED_FIELD, deleted);
+            solrDoc.addField(CommonConstants.DELETED_FIELD, deleted);
             
             if(!deleted) {
               String parentField = null;
               String routingField = null;
-              String type = typeSelector.getType(index, id);
+              String type = typeSelector.getType(bucketName, id);
               if(documentTypeParentFields != null && documentTypeParentFields.containsKey(type)) {
                   parentField = documentTypeParentFields.get(type);
               }
@@ -232,7 +222,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
               if(parentField != null) {
                   Object parent = JSONMapPath(toBeIndexed, parentField);
                   if (parent != null && parent instanceof String ) {
-                    solrDoc.addField(PARENT_FIELD, parent);
+                    solrDoc.addField(CommonConstants.PARENT_FIELD, parent);
                   } else {
                       LOG.warn("Unabled to determine parent value from parent field {} for doc id {}", parentField, id);
                   }
@@ -240,7 +230,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
               if(routingField != null) {
                   Object routing = JSONMapPath(toBeIndexed, routingField);
                   if (routing != null && routing instanceof String) {
-                    solrDoc.addField(ROUTING_FIELD, routing);
+                    solrDoc.addField(CommonConstants.ROUTING_FIELD, routing);
                   } else {
                       LOG.warn("Unable to determine routing value from routing field {} for doc id {}", routingField, id);
                   }
@@ -248,8 +238,8 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
             }
             
             //extract and map json fields
-            JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(index).getSplitpath(),
-                new ArrayList<String>(handler.getBucket(index).getFieldmapping().values()));
+            JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
+                new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
             JSONParser parser = new JSONParser(jsonString);
             Handler handler = new CouchbaseRecordHandler(this, req, solrDoc);
             try {
@@ -263,7 +253,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
           }
           return result;
       } else {
-        LOG.debug("Bucket \"" + index + "\" is not configured with this plugin.");
+        LOG.debug("Bucket \"" + bucketName + "\" is not configured with this plugin.");
       }
       return null;
   }
@@ -407,7 +397,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   void deleteDoc(Object id, SolrQueryRequest req) {
     try {
-      LOG.info("DEleting document:" + id);
+      LOG.info("Deleting document:" + id);
       DeleteUpdateCommand delCmd = new DeleteUpdateCommand(req);
       delCmd.setId(id.toString());
       handler.getProcessor().processDelete(delCmd);
