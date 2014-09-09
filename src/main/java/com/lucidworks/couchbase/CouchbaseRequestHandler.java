@@ -114,12 +114,12 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp)
       throws Exception {
     SolrParams params = req.getParams();
-    String q = params.get(CommonParams.Q);
+    String action = params.get(CommonParams.ACTION);
     
-    q = q.toLowerCase();
-    q = q.trim();
+    action = action.toLowerCase();
+    action = action.trim();
     
-    switch(q) {
+    switch(action) {
     case "start"  :
       startCouchbasePlugin();
       break;
