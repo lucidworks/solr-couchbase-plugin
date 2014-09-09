@@ -36,6 +36,12 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   protected Map<String, String> documentTypeRoutingFields;
   protected CouchbaseRequestHandler handler;
   private boolean commitAfterBatch;
+  
+  protected Counter activeRevsDiffRequests;
+  protected Counter meanRevsDiffRequests;
+  protected Counter activeBulkDocsRequests;
+  protected Counter meanBulkDocsRequests;
+  protected Counter totalTooManyConcurrentRequestsErrors;
 
   public SolrCAPIBehaviour(CouchbaseRequestHandler handler, TypeSelector typeSelector, Map<String, String> documentTypeParentFields, Map<String, String> documentTypeRoutingFields, boolean commitAfterBatch) {
     this.handler = handler;
@@ -43,6 +49,12 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     this.documentTypeParentFields = documentTypeParentFields;
     this.documentTypeRoutingFields = documentTypeRoutingFields;
     this.commitAfterBatch = commitAfterBatch;
+    
+     activeRevsDiffRequests = new Counter();
+     meanRevsDiffRequests = new Counter();
+     activeBulkDocsRequests = new Counter();
+     meanBulkDocsRequests = new Counter();
+     totalTooManyConcurrentRequestsErrors = new Counter();
   }
   
   public Map<String, Object> welcome() {
@@ -105,157 +117,171 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   public Map<String, Object> revsDiff(String database,
           Map<String, Object> revsMap) {
-      String bucketName = getBucketNameFromDatabase(database);
-      if(handler.getBucket(bucketName) != null) {
-          Map<String, Object> responseMap = new HashMap<String, Object>();
-          for (Entry<String, Object> entry : revsMap.entrySet()) {
-              String id = entry.getKey();
-              Object revs = entry.getValue();
-              Map<String, Object> rev = new HashMap<String, Object>();
-              rev.put("missing", revs);
-              responseMap.put(id, rev);
-          }
-          return responseMap;
-      }
-      return null;
+    long start = System.currentTimeMillis();
+    activeBulkDocsRequests.inc();
+    
+    Map<String, Object> responseMap = null;
+    
+    String bucketName = getBucketNameFromDatabase(database);
+    if(handler.getBucket(bucketName) != null) {
+      responseMap = new HashMap<String, Object>();
+        for (Entry<String, Object> entry : revsMap.entrySet()) {
+            String id = entry.getKey();
+            Object revs = entry.getValue();
+            Map<String, Object> rev = new HashMap<String, Object>();
+            rev.put("missing", revs);
+            responseMap.put(id, rev);
+        }
+    }
+    long end = System.currentTimeMillis();
+    meanRevsDiffRequests.inc(end - start);
+    activeRevsDiffRequests.dec();
+    return responseMap;
   }
   
   public List<Object> bulkDocs(String database, List<Map<String, Object>> docs) {
 
-      String bucketName = getBucketNameFromDatabase(database);
-      SolrQueryRequest req = new SolrQueryRequestBase(handler.getCore(), new SolrParams() {
-        
-        @Override
-        public String[] getParams(String param) {
-          // TODO Auto-generated method stub
-          return null;
-        }
-        
-        @Override
-        public Iterator<String> getParameterNamesIterator() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-        
-        @Override
-        public String get(String param) {
-          // TODO Auto-generated method stub
-          return null;
-        }
-      }) {};
-      // keep a map of the id - rev for building the response
-      Map<String,String> revisions = new HashMap<String, String>();
+    long start = System.currentTimeMillis();
+    activeBulkDocsRequests.inc();
+    
+    String bucketName = getBucketNameFromDatabase(database);
+    List<Object> result = null;
+    SolrQueryRequest req = new SolrQueryRequestBase(handler.getCore(), new SolrParams() {
       
-      if(handler.getBucket(bucketName) != null) {
-  
-          List<Object> result = new ArrayList<Object>();
-  
-          for (Map<String, Object> doc : docs) {
-  
-            // these are the top-level elements that could be in the document sent by Couchbase
-            Map<String, Object> meta = (Map<String, Object>)doc.get("meta");
-            Map<String, Object> jsonMap = (Map<String, Object>)doc.get("json");
-            String base64 = (String)doc.get("base64");
-            String jsonString = null;
-            
-            if(meta == null) {
-              // if there is no meta-data section, there is nothing we can do
-              LOG.warn("Document without meta in bulk_docs, ignoring....");
-              continue;
-            } else if("non-JSON mode".equals(meta.get("att_reason"))) {
-                // optimization, this tells us the body isn't json
-                jsonMap = new HashMap<String, Object>();
-            } else if(jsonMap == null && base64 != null) {
-                byte[] decodedData = Base64.decodeBase64(base64);
-                try {
-                  jsonString = new String(decodedData, "UTF-8");
-                  // now try to parse the decoded data as json
-                  jsonMap = (Map<String, Object>) mapper.readValue(decodedData, Map.class);
-                }
-                catch(Exception e) {
-                    LOG.error("Unable to parse decoded base64 data as JSON, indexing stub for id: {}", meta.get("id"));
-                    LOG.error("Body was: {} Parse error was: {}", new String(decodedData), e);
+      @Override
+      public String[] getParams(String param) {
+        // TODO Auto-generated method stub
+        return null;
+      }
+      
+      @Override
+      public Iterator<String> getParameterNamesIterator() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+      
+      @Override
+      public String get(String param) {
+        // TODO Auto-generated method stub
+        return null;
+      }
+    }) {};
+    // keep a map of the id - rev for building the response
+    Map<String,String> revisions = new HashMap<String, String>();
+    
+    if(handler.getBucket(bucketName) != null) {
+
+        result = new ArrayList<Object>();
+
+        for (Map<String, Object> doc : docs) {
+
+          // these are the top-level elements that could be in the document sent by Couchbase
+          Map<String, Object> meta = (Map<String, Object>)doc.get("meta");
+          Map<String, Object> jsonMap = (Map<String, Object>)doc.get("json");
+          String base64 = (String)doc.get("base64");
+          String jsonString = null;
+          
+          if(meta == null) {
+            // if there is no meta-data section, there is nothing we can do
+            LOG.warn("Document without meta in bulk_docs, ignoring....");
+            continue;
+          } else if("non-JSON mode".equals(meta.get("att_reason"))) {
+              // optimization, this tells us the body isn't json
+              jsonMap = new HashMap<String, Object>();
+          } else if(jsonMap == null && base64 != null) {
+              byte[] decodedData = Base64.decodeBase64(base64);
+              try {
+                jsonString = new String(decodedData, "UTF-8");
+                // now try to parse the decoded data as json
+                jsonMap = (Map<String, Object>) mapper.readValue(decodedData, Map.class);
+              }
+              catch(Exception e) {
+                  LOG.error("Unable to parse decoded base64 data as JSON, indexing stub for id: {}", meta.get("id"));
+                  LOG.error("Body was: {} Parse error was: {}", new String(decodedData), e);
                     jsonMap = new HashMap<String, Object>();
  
                 }
             }
             
             // at this point we know we have the document meta-data
-            // and the document contents to be indexed are in json
+          // and the document contents to be indexed are in json
 
-            String id = (String)meta.get("id");
-            String rev = (String)meta.get("rev");
-            revisions.put(id, rev);
-            SolrInputDocument solrDoc = new SolrInputDocument();
-            solrDoc.addField(CommonConstants.ID_FIELD, id);
-            solrDoc.addField(CommonConstants.REVISION_FIELD, rev);
-            solrDoc.addField(CommonConstants.JSON_FIELD, jsonString);
-            solrDoc.addField(CommonConstants.METADATA_FIELD, meta);
-            
-            Map<String, Object> toBeIndexed = new HashMap<String, Object>();
-            toBeIndexed.put("meta", meta);
-            toBeIndexed.put("doc", jsonMap);
+          String id = (String)meta.get("id");
+          String rev = (String)meta.get("rev");
+          revisions.put(id, rev);
+          SolrInputDocument solrDoc = new SolrInputDocument();
+          solrDoc.addField(CommonConstants.ID_FIELD, id);
+          solrDoc.addField(CommonConstants.REVISION_FIELD, rev);
+          solrDoc.addField(CommonConstants.JSON_FIELD, jsonString);
+          solrDoc.addField(CommonConstants.METADATA_FIELD, meta);
+          
+          Map<String, Object> toBeIndexed = new HashMap<String, Object>();
+          toBeIndexed.put("meta", meta);
+          toBeIndexed.put("doc", jsonMap);
 
-            long ttl = 0;
-            Integer expiration = (Integer)meta.get("expiration");
-            if(expiration != null) {
-                ttl = (expiration.longValue() * 1000) - System.currentTimeMillis();
+          long ttl = 0;
+          Integer expiration = (Integer)meta.get("expiration");
+          if(expiration != null) {
+              ttl = (expiration.longValue() * 1000) - System.currentTimeMillis();
+          }
+          if(ttl > 0) {
+            solrDoc.addField(CommonConstants.TTL_FIELD, ttl);
+          }
+          
+          boolean deleted = meta.containsKey("deleted") ? (Boolean)meta.get("deleted") : false;
+          solrDoc.addField(CommonConstants.DELETED_FIELD, deleted);
+          
+          if(!deleted) {
+            String parentField = null;
+            String routingField = null;
+            String type = typeSelector.getType(bucketName, id);
+            if(documentTypeParentFields != null && documentTypeParentFields.containsKey(type)) {
+                parentField = documentTypeParentFields.get(type);
             }
-            if(ttl > 0) {
-              solrDoc.addField(CommonConstants.TTL_FIELD, ttl);
-            }
-            
-            boolean deleted = meta.containsKey("deleted") ? (Boolean)meta.get("deleted") : false;
-            solrDoc.addField(CommonConstants.DELETED_FIELD, deleted);
-            
-            if(!deleted) {
-              String parentField = null;
-              String routingField = null;
-              String type = typeSelector.getType(bucketName, id);
-              if(documentTypeParentFields != null && documentTypeParentFields.containsKey(type)) {
-                  parentField = documentTypeParentFields.get(type);
-              }
-              if(documentTypeRoutingFields != null && documentTypeRoutingFields.containsKey(type)) {
-                  routingField = documentTypeRoutingFields.get(type);
-              }
-              
-              if(parentField != null) {
-                  Object parent = JSONMapPath(toBeIndexed, parentField);
-                  if (parent != null && parent instanceof String ) {
-                    solrDoc.addField(CommonConstants.PARENT_FIELD, parent);
-                  } else {
-                      LOG.warn("Unabled to determine parent value from parent field {} for doc id {}", parentField, id);
-                  }
-              }
-              if(routingField != null) {
-                  Object routing = JSONMapPath(toBeIndexed, routingField);
-                  if (routing != null && routing instanceof String) {
-                    solrDoc.addField(CommonConstants.ROUTING_FIELD, routing);
-                  } else {
-                      LOG.warn("Unable to determine routing value from routing field {} for doc id {}", routingField, id);
-                  }
-              }
+            if(documentTypeRoutingFields != null && documentTypeRoutingFields.containsKey(type)) {
+                routingField = documentTypeRoutingFields.get(type);
             }
             
-            //extract and map json fields
-            JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
-                new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
-            JSONParser parser = new JSONParser(jsonString);
-            Handler handler = new CouchbaseRecordHandler(this, req, solrDoc);
-            try {
-              rr.streamRecords(parser, handler);
-            } catch (IOException e) {
-              LOG.error("Cannot parse Couchbase record!", e);
+            if(parentField != null) {
+                Object parent = JSONMapPath(toBeIndexed, parentField);
+                if (parent != null && parent instanceof String ) {
+                  solrDoc.addField(CommonConstants.PARENT_FIELD, parent);
+                } else {
+                    LOG.warn("Unabled to determine parent value from parent field {} for doc id {}", parentField, id);
+                }
+            }
+            if(routingField != null) {
+                Object routing = JSONMapPath(toBeIndexed, routingField);
+                if (routing != null && routing instanceof String) {
+                  solrDoc.addField(CommonConstants.ROUTING_FIELD, routing);
+                } else {
+                    LOG.warn("Unable to determine routing value from routing field {} for doc id {}", routingField, id);
+                }
             }
           }
-          if(commitAfterBatch) {
-            commit(req);
+          
+          //extract and map json fields
+          JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
+              new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
+          JSONParser parser = new JSONParser(jsonString);
+          Handler handler = new CouchbaseRecordHandler(this, req, solrDoc);
+          try {
+            rr.streamRecords(parser, handler);
+          } catch (IOException e) {
+            LOG.error("Cannot parse Couchbase record!", e);
           }
-          return result;
-      } else {
-        LOG.debug("Bucket \"" + bucketName + "\" is not configured with this plugin.");
-      }
-      return null;
+        }
+        if(commitAfterBatch) {
+          commit(req);
+        }
+    } else {
+      LOG.debug("Bucket \"" + bucketName + "\" is not configured with this plugin.");
+    }
+    
+    long end = System.currentTimeMillis();
+    meanBulkDocsRequests.inc(end - start);
+    activeBulkDocsRequests.dec();
+    return result;
   }
   
   public Map<String, Object> getDocument(String database, String docId) {
@@ -345,7 +371,25 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   @Override
   public Map<String, Object> getStats() {
-      return new HashMap<String, Object>();
+    Map<String, Object> stats = new HashMap<String, Object>();
+
+    Map<String, Object> bulkDocsStats = new HashMap<String, Object>();
+    bulkDocsStats.put("activeCount", activeBulkDocsRequests.count());
+    bulkDocsStats.put("totalCount", meanBulkDocsRequests.count());
+    bulkDocsStats.put("totalTime", meanBulkDocsRequests.sum());
+    bulkDocsStats.put("avgTime", meanBulkDocsRequests.mean());
+
+    Map<String, Object> revsDiffStats = new HashMap<String, Object>();
+    revsDiffStats.put("activeCount", activeRevsDiffRequests.count());
+    revsDiffStats.put("totalCount", meanRevsDiffRequests.count());
+    revsDiffStats.put("totalTime", meanRevsDiffRequests.sum());
+    revsDiffStats.put("avgTime", meanRevsDiffRequests.mean());
+
+    stats.put("_bulk_docs", bulkDocsStats);
+    stats.put("_revs_diff", revsDiffStats);
+//    stats.put("tooManyConcurrentRequestsErrors", totalTooManyConcurrentRequestsErrors.count());
+
+    return stats;
   }
   
   public String getVBucketUUID(String pool, String bucket, int vbucket) {
