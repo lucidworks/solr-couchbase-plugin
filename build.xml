@@ -62,7 +62,7 @@
     <property name="compile.resolved" value="true" />
   </target>
   
-  <target name="ivy-resolve-jetty" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="runtime.resolved">
+  <target name="ivy-resolve-jetty" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="jetty.resolved">
     <ivy-resolve-conf conf="jetty" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
     <property name="jetty.resolved" value="true" />
   </target>
@@ -133,22 +133,93 @@
   
   <target name="solr-check">
     <mkdir dir="${solr.dir}/dist" />
-    <available file="${solr.dir}/dist/solr-${solr.version}.zip" property="solrzip.exists"/>
+    <available file="${solr.dir}/dist/solr-${solr.server.version}.zip" property="solrzip.exists"/>
     <echo>solrzip.exists=${solrzip.exists}</echo>
   </target>
 
   <target name="get-solr" unless="solrzip.exists" depends="solr-check">
-    <get src="http://archive.apache.org/dist/lucene/solr/${solr.version}/solr-${solr.version}.zip"
-                dest="${solr.dir}/dist/solr-${solr.version}.zip"/>
+    <get src="http://archive.apache.org/dist/lucene/solr/${solr.server.version}/solr-${solr.server.version}.zip"
+                dest="${solr.dir}/dist/solr-${solr.server.version}.zip"/>
   </target>
 
   <available file="${solr.app.dir}" type="dir" property="solr.prep.skip" />
   
   <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-runtime" >
-    <prep-solr solr.unpack.dir="${solr.app.dir}" solr.version="${solr.version}"/>
+    <my-prep-solr solr.dir="${solr.app.dir}" solr.version="${solr.server.version}"/>
   </target>
   
   <macrodef name="prep-solr">
+      <attribute name="solr.dir"/>
+      <attribute name="solr.version"/>
+      <sequential>
+        <echo>Unpacking Solr @{solr.version} into @{solr.dir} from module ${ant.project.name}</echo>
+
+        <ivy:resolve conf="solr.war" log="download-only"/>
+        <ivy:retrieve conf="solr.war" type="war" pattern="@{solr.dir}/webapps/[artifact].[ext]"/>
+
+        <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.dir}">
+          <patternset>
+            <include name="solr-@{solr.version}/example/contexts/**"/>
+            <include name="solr-@{solr.version}/example/etc/**"/>
+            <include name="solr-@{solr.version}/example/resources/**"/>
+            <include name="solr-@{solr.version}/example/solr/**"/>
+          </patternset>
+          <mapper>
+            <globmapper from="solr-@{solr.version}/example/*" to="*"/>
+          </mapper>
+        </unzip>
+
+        <ivy:resolve conf="solr.jetty" log="download-only"/>
+        <ivy:retrieve conf="solr.jetty" pattern="@{solr.dir}/lib/[artifact]-[revision].[ext]"/>
+        <move tofile="@{solr.dir}/lib/servlet-api-3.0.jar" overwrite="true">
+          <fileset dir="@{solr.dir}/lib" includes="javax.servlet-3.0.0*"/>
+        </move>
+
+        <ivy:resolve conf="solr.start" log="download-only"/>
+        <ivy:retrieve conf="solr.start" pattern="@{solr.dir}/[artifact].[ext]"/>
+
+        <ivy:resolve conf="solr.logging" log="download-only"/>
+        <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
+
+        <mkdir dir="${solr.extra.libs}"/>
+        <mkdir dir="@{solr.dir}/${solr.sharedlib.dir}"/>
+        <copy todir="@{solr.dir}/${solr.sharedlib.dir}">
+          <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
+          <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+          <fileset dir="${lib.dir}/jetty" includes="*"/>
+          <fileset dir="${lib.dir}/runtime" includes="*"/>
+        </copy>
+        
+        <delete dir="${build.dir}/solr-war"/>
+        <mkdir dir="${build.dir}/solr-war"/>
+        <unwar src="@{solr.dir}/webapps/solr.war" dest="${build.dir}/solr-war">
+          <patternset>
+            <include name="**/*"/>
+          </patternset>
+        </unwar>
+        
+        <delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>
+        <copy todir="${build.dir}/solr-war/WEB-INF/lib">
+          <fileset dir="${lib.dir}/runtime" includes="commons-io-2.4.jar"/>
+        </copy>
+        <war destfile="${build.dir}/solr-war/solr.war" webxml="${build.dir}/solr-war/WEB-INF/web.xml">
+          <fileset dir="${build.dir}/solr-war">
+            <include name="**/*" />
+          </fileset>
+        </war>
+        <move tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
+          <fileset file="${build.dir}/solr-war/solr.war"/>
+        </move>
+        
+        <!--<jar destfile="@{solr.dir}/webapps/solr.war" update="true" >
+          <zipfileset dir="${solr.extra.libs}" includes="*.jar" prefix="WEB-INF/lib" />
+        </jar>-->
+
+      </sequential>
+    </macrodef>
+  
+  
+  <macrodef name="my-prep-solr">
     <attribute name="solr.unpack.dir"/>
     <attribute name="solr.version"/>
     <sequential>
@@ -169,8 +240,20 @@
         </mapper>
       </unzip>
       
-      <mkdir dir="${solr.sharedlib.dir}"/>
-      <copy todir="${solr.sharedlib.dir}">
+      <ivy:resolve conf="solr.jetty" log="download-only"/>
+      <ivy:retrieve conf="solr.jetty" pattern="@{solr.dir}/lib/[artifact]-[revision].[ext]"/>
+      <move tofile="@{solr.dir}/lib/servlet-api-3.0.jar" overwrite="true">
+        <fileset dir="@{solr.dir}/lib" includes="javax.servlet-3.0.0*"/>
+      </move>
+      
+      <ivy:resolve conf="solr.start" log="download-only"/>
+      <ivy:retrieve conf="solr.start" pattern="@{solr.dir}/[artifact].[ext]"/>
+
+      <ivy:resolve conf="solr.logging" log="download-only"/>
+      <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
+
+      <mkdir dir="@{solr.unpack.dir}/${solr.sharedlib.dir}"/>
+      <copy todir="@{solr.unpack.dir}/${solr.sharedlib.dir}">
         <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
         <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
         <fileset dir="${lib.dir}/jetty" includes="*"/>
@@ -247,4 +330,182 @@
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
     </java>
   </target>
+  
+  <!-- Run two node SolrCloud cluster -->
+  <!----><target name="run-solr-cloud" description="Run interactive SolrCloud">
+    <parallel>
+      <antcall target="run-solr-cloud-1"/>
+      <antcall target="run-solr-cloud-2"/>
+      <antcall target="wait-and-test-zk"/>
+    </parallel>
+  </target>
+  
+  <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty">
+    <prep-solr solr.dir="${solr.cloud.dir.1}" solr.version="${solr.server.version}"/>
+    <prep-solr solr.dir="${solr.cloud.dir.2}" solr.version="${solr.server.version}"/>
+  </target>
+  
+  <macrodef name="patch-solr">
+    <attribute name="original.file"/>
+    <attribute name="patch.file"/>
+    <sequential>
+      <exec executable="dos2unix">
+        <arg value="@{original.file}"/>
+      </exec>
+      <patch
+        patchfile="@{patch.file}"
+        originalfile="@{original.file}"
+        ignorewhitespace="true"
+        failonerror="true" />
+    </sequential>
+  </macrodef>
+  
+  <target name="check-patches-exist">
+    <condition property="patches.exist">
+      <and>
+        <available file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+        <available file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+      </and>
+    </condition>
+  </target>
+  
+  <target name="patch-solr-cloud" if="patches.exist" depends="check-patches-exist, prep-solr-cloud">
+    <patch-solr original.file="${solr.cloud.dir.1}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <patch-solr original.file="${solr.cloud.dir.2}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <patch-solr original.file="${solr.cloud.dir.1}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.cloud.dir.2}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+  </target>
+  
+  
+  <target name="solr-cloud" depends="prep-solr-cloud, patch-solr-cloud" description="Install and run interactively SolrCloud cluster">
+    <parallel>
+      <antcall target="run-solr-cloud-1"/>
+      <antcall target="run-solr-cloud-2"/>
+
+      <!-- Wait for 120 seconds for each to come up -->
+      <sequential>
+        <echo message="SolrCloud is starting"/>
+        <waitfor maxwait="120" maxwaitunit="second" timeoutproperty="timeout">
+          <and>
+            <socket server="localhost" port="${solr.cloud.port.1}"/>
+<!--            <socket server="localhost" port="${solr.cloud.stop.port.1}"/> -->
+            <socket server="localhost" port="${solr.cloud.port.2}"/>
+<!--            <socket server="localhost" port="${solr.cloud.stop.port.2}"/> -->
+<!--            <socket server="localhost" port="${solr.cloud.zk.port}"/> -->
+            <http url="http://localhost:${solr.cloud.port.1}/solr"/>
+            <http url="http://localhost:${solr.cloud.port.2}/solr"/>
+            <http url="http://localhost:${solr.cloud.port.1}/solr/collection1/admin/ping?distrib=true"/>
+            <http url="http://localhost:${solr.cloud.port.2}/solr/collection1/admin/ping?distrib=true"/>
+          </and>
+        </waitfor>
+        <fail if="timeout" message="SolrCloud failed to startup in 120 seconds"/>
+        <echo message="SolrCloud finished starting"/>
+      </sequential>
+    </parallel>
+  </target>
+  
+  <!-- Stop two node SolrCloud cluster -->
+  <target name="stop-solr-cloud">
+    <!-- Stop second server -->
+    <java dir="${solr.cloud.dir.2}" jar="${solr.cloud.dir.2}/jetty-start.jar" fork="true" failonerror="false" resultproperty="jetty.stop.result.2">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.2}"/>
+      <sysproperty key="STOP.KEY" value="srsly.stop"/>
+      <arg value="--stop"/>
+    </java>
+    <echo message="Jetty stop command `java -jar ${solr.cloud.dir.2}/jetty-start.jar -DSTOP.PORT=${solr.cloud.stop.port.2} -DSTOP.KEY=srsly.stop --stop` command returned: ${jetty.stop.result.2}"/>
+
+    <!-- wait for the node w/o zk to shut down first -->
+    <sleep seconds="10"/>
+    
+    <!-- Stop first server -->
+    <java dir="${solr.cloud.dir.1}" jar="${solr.cloud.dir.1}/jetty-start.jar" fork="true" failonerror="false" resultproperty="jetty.stop.result.1">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.1}"/>
+      <sysproperty key="STOP.KEY" value="srsly.stop"/>
+      <arg value="--stop"/>
+    </java>
+    <echo message="Jetty stop command `java -jar ${solr.cloud.dir.1}/jetty-start.jar -DSTOP.PORT=${solr.cloud.stop.port.1} -DSTOP.KEY=srsly.stop --stop` command returned: ${jetty.stop.result.1}"/>
+    
+    <sequential>
+      <waitfor maxwait="120" maxwaitunit="second" timeoutproperty="timeout">
+        <not>
+          <or>
+            <socket server="localhost" port="${solr.cloud.port.1}"/>
+            <socket server="localhost" port="${solr.cloud.stop.port.1}"/>
+            <socket server="localhost" port="${solr.cloud.port.2}"/>
+            <socket server="localhost" port="${solr.cloud.stop.port.2}"/>
+            <socket server="localhost" port="${solr.cloud.zk.port}"/>
+          </or>
+        </not>
+      </waitfor>
+      <fail if="timeout" message="SolrCloud failed to shutdown in 120 seconds"/>
+    </sequential>
+    
+  </target>
+
+  <target name="run-solr-cloud-1">
+    <tstamp>
+      <format property="start.time" pattern="yyyy-MM-dd'T'hh:mm:ss"/>
+    </tstamp>
+    <property name="solr.log.1" location="${solr.cloud.dir.1}/solr-${start.time}.log"/>
+    <echo message="Starting SolrCloud 1 on ${solr.cloud.port.1}, logging to ${solr.log.1}"/>
+    <java dir="${solr.cloud.dir.1}" jar="${solr.cloud.dir.1}/jetty-start.jar" fork="true" failonerror="true" output="${solr.log.1}">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <jvmarg line="-Xmx${heap.size}"/>
+      
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
+      <jvmarg line="-Dhost=localhost -DzkRun=localhost:${solr.cloud.zk.port} -DnumShards=2 -Dbootstrap_confdir=./solr/collection1/conf -Dcollection.configName=default"/>
+      <sysproperty key="jetty.port" value="${solr.cloud.port.1}"/>
+      <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.1}"/>
+      <sysproperty key="STOP.KEY" value="srsly.stop"/>
+    </java>
+  </target>
+
+
+  <target name="run-solr-cloud-2">
+    <sleep seconds="10"/>
+    <!-- Give the leader a head start -->
+    <tstamp>
+      <format property="start.time" pattern="yyyy-MM-dd'T'hh:mm:ss"/>
+    </tstamp>
+    <property name="solr.log.2" location="${solr.cloud.dir.2}/solr-${start.time}.log"/>
+    <echo message="Starting SolrCloud 2 on ${solr.cloud.port.2}, logging to ${solr.log.2}"/>
+    <java dir="${solr.cloud.dir.2}" jar="${solr.cloud.dir.2}/jetty-start.jar" fork="true" failonerror="true" output="${solr.log.2}">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <jvmarg line="-Xmx${heap.size}"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5006,suspend=n"/>
+      <jvmarg line="-Dhost=localhost -DzkHost=localhost:${solr.cloud.zk.port} -DnumShards=2"/>
+      <sysproperty key="jetty.port" value="${solr.cloud.port.2}"/>
+      <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.2}"/>
+      <sysproperty key="STOP.KEY" value="srsly.stop"/>
+    </java>
+  </target>
+
+  <target name="check-zk-status" if="${zk.down}">
+    <echo>ZooKeeper failed to start. 
+        See the log for details; this is usually caused by a port conflict, often when the previous instance of ZooKeeper had not yet released the port.</echo>
+    <antcall target="stop-solr-cloud"/>
+    <fail message="ZooKeeper failed to start"/>
+  </target>
+
+  <target name="get-zk-status">
+     <exec executable="bash" failonerror="false" resultproperty="zk.result" outputproperty="zk.status">
+       <arg value="-c"/>
+       <arg value="echo -n 'stat' | nc localhost ${solr.cloud.zk.port}"/>
+   </exec>
+    <condition property="zk.down">
+        <isfailure code="${zk.result}"/>
+    </condition>
+  </target>
+
+  <target name="test-zk" description="see if ZooKeeper is running" depends="get-zk-status,check-zk-status">
+    <echo message="ZooKeeper started successfully."/>
+  </target>
+
+  <target name="wait-and-test-zk">
+      <sleep seconds="20"/>
+      <antcall target="test-zk"/>
+  </target>
+  
 </project>

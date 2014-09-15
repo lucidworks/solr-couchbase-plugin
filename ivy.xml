@@ -7,35 +7,55 @@
     <conf name="test" extends="compile"/>
     <conf name="jetty" visibility="private"/>
     <conf name="runtime" visibility="private"/>
+    
+    <conf name="solr.war"/>
+    <conf name="solr.jetty"/>
+    <conf name="solr.start"/>
+    <conf name="solr.logging"/>
   </configurations>
 
   <dependencies>
     <!-- solr -->
-    <dependency org="org.apache.solr" name="solr-analysis-extras" rev="${solr.version}" conf="compile->default"/>
-    <dependency org="org.apache.solr" name="solr-clustering" rev="${solr.version}" conf="compile->default"/>
-    <dependency org="org.apache.solr" name="solr-dataimporthandler-extras" rev="${solr.version}" conf="compile->default"/>
-    <dependency org="org.apache.solr" name="solr-langid" rev="${solr.version}" conf="compile->default"/>
-    <dependency org="org.apache.solr" name="solr-test-framework" rev="${solr.version}" conf="test->default">
+    <dependency org="org.apache.solr" name="solr-analysis-extras" rev="${solr.server.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-clustering" rev="${solr.server.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-dataimporthandler-extras" rev="${solr.server.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-langid" rev="${solr.server.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-test-framework" rev="${solr.server.version}" conf="test->default">
         <exclude module="lucene-test-framework"/>
     </dependency>
-    <dependency org="org.apache.solr" name="solr-uima" rev="${solr.version}" conf="compile->default"/>
-    <dependency org="org.apache.solr" name="solr-velocity" rev="${solr.version}" conf="compile->default"/>
-    <dependency org="org.apache.solr" name="solr-solrj" rev="4.10.0" conf="compile->default;runtime->default"/>
-    <!-- jetty -->
-    <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="${jetty.version}" conf="compile->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="${jetty.servlet.version}" conf="compile->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version}" conf="test->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-client" rev="${jetty.version}" conf="test->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-servlets" rev="${jetty.version}" conf="test->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-xml" rev="${jetty.version}" conf="test->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" conf="compile->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-client" rev="${jetty.version2}" conf="test->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version2}" conf="test->default;jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-servlets" rev="${jetty.version2}" conf="test->default;jetty->default"/>
-    <dependency org="javax.servlet" name="javax.servlet-api" rev="3.1.0" conf="compile->default"/>
-    <dependency org="org.mortbay.jetty" name="jetty-runner" rev="${jetty.runner.version}" conf="jetty->master"/>
+    <dependency org="org.apache.solr" name="solr-uima" rev="${solr.server.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-velocity" rev="${solr.server.version}" conf="compile->default"/>
+    <dependency org="org.apache.solr" name="solr-solrj" rev="${solr.server.version}" conf="compile->default"/>
+    
+    <!-- Jetty -->
+    <!-- Grab the Solr war and Jetty runtime -->
+    <dependency org="org.apache.solr" name="solr" rev="${solr.server.version}" conf="solr.war->master">
+      <artifact name="solr" type="war" ext="war"/>
+    </dependency>
+    <dependency org="org.eclipse.jetty" name="jetty-continuation" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-deploy" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-http" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-io" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-jmx" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-util" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-xml" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-start" rev="${jetty.version}" transitive="false" conf="solr.start->default"/>
+    <dependency org="org.eclipse.jetty.orbit" name="javax.servlet" rev="${servlet.version}" transitive="false" conf="jetty->default;solr.jetty->default">
+      <artifact name="javax.servlet" type="orbit" ext="jar"/>
+    </dependency>
+    <dependency org="org.mortbay.jetty" name="jetty-runner" rev="${jetty.version}" conf="solr.jetty->master"/>
+    
     <!-- slf4j -->
-    <dependency org="org.slf4j" name="slf4j-log4j12" rev="1.6.4" conf="compile->default"/>
+    <dependency org="log4j" name="log4j" rev="1.2.16" transitive="false" conf="solr.logging->default"/>
+    <dependency org="org.slf4j" name="slf4j-log4j12" rev="1.6.6" transitive="false" conf="solr.logging->default"/>
+    <dependency org="org.slf4j" name="slf4j-api" rev="1.7.5" transitive="false" conf="solr.logging->default"/>
+    <dependency org="org.slf4j" name="jcl-over-slf4j" rev="1.6.6" transitive="false" conf="solr.logging->default"/>
+    <dependency org="org.slf4j" name="jul-to-slf4j" rev="1.6.6" transitive="false" conf="solr.logging->default"/>
+    
     <!-- commons-codec -->
     <dependency org="commons-codec" name="commons-codec" rev="1.6" conf="compile->default"/>
     <!-- jackson-mapper-asl -->
@@ -48,12 +68,12 @@
     <!-- other -->
     <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="runtime->default"/>
     <dependency org="commons-io" name="commons-io" rev="2.4" conf="compile->default;runtime->default"/>
-    <dependency org="org.apache.lucene" name="lucene-test-framework" rev="${solr.version}" conf="test->master"/>
+    <dependency org="org.apache.lucene" name="lucene-test-framework" rev="${solr.server.version}" conf="test->master"/>
     <dependency org="com.carrotsearch.randomizedtesting" name="randomizedtesting-runner" rev="2.1.6" conf="compile->default"/>
     <dependency org="com.carrotsearch.randomizedtesting" name="junit4-ant" rev="2.1.6" conf="compile->default"/>
     <dependency org="org.apache.ant" name="ant" rev="1.9.2" conf="test->default"/>
     
     <!-- exludes -->
-    <exclude org="org.eclipse.jetty.orbit"/>
+    <exclude org="org.eclipse.jetty.orbit" artifact="javax-servlet-working@karol.jar" matcher="exact"/>
   </dependencies>
 </ivy-module>

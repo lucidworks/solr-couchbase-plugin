@@ -1,12 +1,19 @@
 package com.lucidworks.couchbase;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.solr.cloud.CouchbaseElectionContext;
+import org.apache.solr.cloud.ElectionContext;
+import org.apache.solr.cloud.LeaderElector;
+import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.request.SolrQueryRequest;
@@ -15,6 +22,7 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +34,7 @@ import com.couchbase.capi.CouchbaseBehavior;
 public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrCoreAware {
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
+  private static final String SKIP_INIT = "skip-init";
   
   CouchbaseBehavior couchbaseBehaviour;
   CAPIBehavior capiBehaviour;
@@ -38,10 +47,17 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private Settings settings;
   private SolrCore core;
   private UpdateRequestProcessor processor;
+  private LeaderElector elector;
+  private ElectionContext context;
+  private static SolrZkClient zkClient;
+  private static String zkServers = "";
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
   private Map<String,Bucket> buckets = new HashMap<String, Bucket>();
+  
+  @Override
+  public String getSource() { return null; }
 
   @Override
   public void inform(SolrCore core) {
@@ -70,6 +86,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     UpdateRequestProcessorChain processorChain =
         core.getUpdateProcessingChain("");
     processor = processorChain.createProcessor(req, rsp);
+    zkClient = getZkClient();
   }
   
   @Override
@@ -134,16 +151,43 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     return "Couchbase plugin";
   }
   
-  @Override
-  public String getSource() { return null; }
+  public SolrZkClient getZkClient() {
+    SolrZkClient client = null;
+    if(core != null) {
+      CoreContainer container = core.getCoreDescriptor().getCoreContainer();
+      if(container.isZooKeeperAware()) {
+        client = container.getZkController().getZkClient();
+      }
+    }
+    return client;
+  }
 
   public void startCouchbasePlugin() {
+    elector = new LeaderElector(zkClient);
+    final String coreNodeName = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
+    CouchbaseElectionContext electionContext = new CouchbaseElectionContext(this, coreNodeName, zkClient);
+    try {
+      elector.setup(electionContext);
+      elector.joinElection(electionContext, false);
+    } catch (InterruptedException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (KeeperException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+  }
+  
+  public void startCouchbaseReplica() {
     server = new CAPIServer(capiBehaviour, couchbaseBehaviour, port, username, password);
     //TODO fix this
     try{
       server.start();
     } catch (Exception e) {
-      
+      LOG.error("Could not start CAPIServer!", e);
     }
     port = server.getPort();
     LOG.info(String.format("CAPIServer started on port %d", port));
