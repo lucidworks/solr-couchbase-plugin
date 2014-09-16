@@ -4,7 +4,7 @@
      <defaultQuery>*:*</defaultQuery>
    </admin>
  
-+  <requestHandler name="/couchbase" class="com.lucidworks.couchbase.CouchbaseRequestHandler">
++  <requestHandler name="/couchbase" class="org.apache.solr.couchbase.CouchbaseRequestHandler">
 +    <lst name="params">
 +      <str name="username">admin</str>
 +      <str name="password">admin123</str>

@@ -1,5 +1,5 @@
 <ivy-module version="2.0">
-  <info organisation="com.lucidworks" module="solr-couchbase-plugin" revision="${solr.couchbase.plugin.version}"/>
+  <info organisation="Apache" module="solr-couchbase-plugin" revision="${solr.couchbase.plugin.version}"/>
 
   <configurations defaultconfmapping="default->default">
     <conf name="default" extends="compile"/>

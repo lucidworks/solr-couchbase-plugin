@@ -55,7 +55,7 @@ The whole solr.xml file should look as follows:
 It is required to configure Couchbase buckets to index data from in the solrconfig.xml file under */couchbase* RequestHandler. Whole RequestHandler configuration should look as following:
 
 ```
-<requestHandler name="/couchbase" class="com.lucidworks.couchbase.CouchbaseRequestHandler">
+<requestHandler name="/couchbase" class="org.apache.solr.couchbase.CouchbaseRequestHandler">
   <lst name="params">
     <str name="username">admin</str>
     <str name="password">admin123</str>

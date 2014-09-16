@@ -126,7 +126,7 @@
       <manifest>
           <attribute name="Built-By" value="${user.name}"/>
          <!-- Information about the program itself -->
-         <attribute name="Implementation-Vendor" value="LucidWorks, Inc."/>
+         <attribute name="Implementation-Vendor" value="Apache"/>
          <attribute name="Specification-Title" value="${ant.project.name}"/>
          <attribute name="Implementation-Title" value="${ant.project.name}"/>
          <attribute name="Implementation-Version" value="${solr.couchbase.plugin.version}"/>
