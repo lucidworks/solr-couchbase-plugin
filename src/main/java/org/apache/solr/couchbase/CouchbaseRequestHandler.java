@@ -6,8 +6,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.solr.cloud.ElectionContext;
-import org.apache.solr.cloud.LeaderElector;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -36,7 +34,6 @@ import com.couchbase.capi.CouchbaseBehavior;
 public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrCoreAware {
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
-  private static final String SKIP_INIT = "skip-init";
   
   private CouchbaseBehavior couchbaseBehaviour;
   private CAPIBehavior capiBehaviour;
@@ -49,10 +46,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private Settings settings;
   private SolrCore core;
   private UpdateRequestProcessor processor;
-  private LeaderElector elector;
-  private ElectionContext context;
   private static SolrZkClient zkClient;
-  private static String zkServers = "";
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
 
