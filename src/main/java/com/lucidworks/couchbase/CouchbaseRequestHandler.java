@@ -1,15 +1,17 @@
 package com.lucidworks.couchbase;
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.solr.cloud.CouchbaseElectionContext;
 import org.apache.solr.cloud.ElectionContext;
 import org.apache.solr.cloud.LeaderElector;
+import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkNodeProps;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
@@ -36,9 +38,9 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
   private static final String SKIP_INIT = "skip-init";
   
-  CouchbaseBehavior couchbaseBehaviour;
-  CAPIBehavior capiBehaviour;
-  CAPIServer server;
+  private CouchbaseBehavior couchbaseBehaviour;
+  private CAPIBehavior capiBehaviour;
+  private CAPIServer server;
   private String host = "127.0.0.1";
   private int port;
   private String username;
@@ -51,6 +53,8 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private ElectionContext context;
   private static SolrZkClient zkClient;
   private static String zkServers = "";
+  private ZkStateReader zkStateReader;
+  private boolean commitAfterBatch;
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
@@ -96,7 +100,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     username = params.get(CommonConstants.USERNAME_FIELD);
     password = params.get(CommonConstants.PASSWORD_FIELD);
     port = Integer.parseInt(params.get(CommonConstants.PORT_FIELD));
-    boolean commitAfterBatch = Boolean.parseBoolean(params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD));
+    commitAfterBatch = Boolean.parseBoolean(params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD));
     
     List<NamedList<Object>> bucketslist = args.getAll(CommonConstants.BUCKET_MARK);
     for(NamedList<Object> bucket : bucketslist) {
@@ -107,24 +111,6 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       Bucket b = new Bucket(name, splitpath, fieldmappings);
       buckets.put(name, b);
     }
-    
-    settings = new Settings();
-    this.documentTypeParentFields = settings.getByPrefix("couchbase.documentTypeParentFields.");
-    for (String key: documentTypeParentFields.keySet()) {
-        String parentField = documentTypeParentFields.get(key);
-        LOG.info("Using field {} as parent for type {}", parentField, key);
-    }
-
-    this.documentTypeRoutingFields = settings.getByPrefix("couchbase.documentTypeRoutingFields.");
-    for (String key: documentTypeRoutingFields.keySet()) {
-        String routingField = documentTypeRoutingFields.get(key);
-        LOG.info("Using field {} as routing for type {}", routingField, key);
-    }
-    typeSelector = new DefaultTypeSelector();
-    typeSelector.configure(settings);
-    couchbaseBehaviour = new SolrCouchbaseBehaviour(this);
-    capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
-    
   }
   
   @Override
@@ -138,10 +124,10 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     
     switch(action) {
     case "start"  :
-      startCouchbasePlugin();
+      handleStart();
       break;
     case "stop" :
-      stopCouchbasePlugin();
+      handleStop();
       break;
     }
   }
@@ -161,27 +147,66 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
     return client;
   }
-
-  public void startCouchbasePlugin() {
-    elector = new LeaderElector(zkClient);
-    final String coreNodeName = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
-    CouchbaseElectionContext electionContext = new CouchbaseElectionContext(this, coreNodeName, zkClient);
+  public boolean isSolrCloud() {
+    return core.getCoreDescriptor().getCoreContainer().isZooKeeperAware();
+  }
+  
+  public void handleStart() {
+    //Check if in SolrCloud mode
+    if(isSolrCloud()) {
+      checkIfIamLeader();
+    } else {
+      startCouchbaseReplica();
+    }
+  }
+  
+  public void handleStop() {
+    stopCouchbasePlugin();
+  }
+  
+  public void checkIfIamLeader() {
+    //at first, check if I am the first leader, which shoudld start Couchbase replica
+    zkStateReader = new ZkStateReader(getZkClient());
     try {
-      elector.setup(electionContext);
-      elector.joinElection(electionContext, false);
+      zkStateReader.updateClusterState(true);
+    } catch (KeeperException | InterruptedException e1) {
+      LOG.error("Error while updating Cluster State!", e1);
+    }
+    String collection = "collection1";
+    Map<String,Slice> slices = zkStateReader.getClusterState().getActiveSlicesMap(collection);
+    List<String> sliceNames = new ArrayList<String>(slices.keySet());
+    Collections.sort(sliceNames);
+    String shard = sliceNames.get(0);
+    Replica replica = null;
+    try {
+      replica = zkStateReader.getLeaderRetry(collection, shard);
     } catch (InterruptedException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    } catch (KeeperException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      LOG.error("Could not get leader!", e);
+    }
+    final String coreNodeName = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
+    //if I am leader
+    if(replica != null && coreNodeName != null && replica.getName().equals(coreNodeName)) {
+      startCouchbaseReplica();
     }
   }
   
   public void startCouchbaseReplica() {
+    settings = new Settings();
+    this.documentTypeParentFields = settings.getByPrefix("couchbase.documentTypeParentFields.");
+    for (String key: documentTypeParentFields.keySet()) {
+        String parentField = documentTypeParentFields.get(key);
+        LOG.info("Using field {} as parent for type {}", parentField, key);
+    }
+
+    this.documentTypeRoutingFields = settings.getByPrefix("couchbase.documentTypeRoutingFields.");
+    for (String key: documentTypeRoutingFields.keySet()) {
+        String routingField = documentTypeRoutingFields.get(key);
+        LOG.info("Using field {} as routing for type {}", routingField, key);
+    }
+    typeSelector = new DefaultTypeSelector();
+    typeSelector.configure(settings);
+    couchbaseBehaviour = new SolrCouchbaseBehaviour(this);
+    capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
     server = new CAPIServer(capiBehaviour, couchbaseBehaviour, port, username, password);
     //TODO fix this
     try{
@@ -194,10 +219,12 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   }
   
   public void stopCouchbasePlugin() {
-    try {
-      server.stop();
-    } catch (Exception e) {
-      LOG.error("Error while stopping CAPI server.", e);
+    if(server != null) {
+      try {
+        server.stop();
+      } catch (Exception e) {
+        LOG.error("Error while stopping Couchbase server.", e);
+      }
     }
   }
   

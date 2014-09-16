@@ -67,6 +67,11 @@
     <property name="jetty.resolved" value="true" />
   </target>
   
+  <target name="ivy-resolve-solr-jetty" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="solr.jetty.resolved">
+    <ivy-resolve-conf conf="solr.jetty" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
+    <property name="solr.jetty.resolved" value="true" />
+  </target>
+  
   <target name="ivy-resolve-runtime" depends="ivy-init, ant-download, init" description="fetch dependencies with ivy" unless="runtime.resolved">
     <ivy-resolve-conf conf="runtime" file="${basedir}/ivy.xml" lib.dir="${lib.dir}" report.dir="${build.dir}/ivy-report" />
     <property name="runtime.resolved" value="true" />
@@ -144,184 +149,90 @@
 
   <available file="${solr.app.dir}" type="dir" property="solr.prep.skip" />
   
-  <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-runtime" >
-    <my-prep-solr solr.dir="${solr.app.dir}" solr.version="${solr.server.version}"/>
+  <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-solr-jetty, ivy-resolve-runtime" >
+    <prep-solr solr.dir="${solr.app.dir}" solr.version="${solr.server.version}"/>
   </target>
   
   <macrodef name="prep-solr">
-      <attribute name="solr.dir"/>
-      <attribute name="solr.version"/>
-      <sequential>
-        <echo>Unpacking Solr @{solr.version} into @{solr.dir} from module ${ant.project.name}</echo>
-
-        <ivy:resolve conf="solr.war" log="download-only"/>
-        <ivy:retrieve conf="solr.war" type="war" pattern="@{solr.dir}/webapps/[artifact].[ext]"/>
-
-        <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.dir}">
-          <patternset>
-            <include name="solr-@{solr.version}/example/contexts/**"/>
-            <include name="solr-@{solr.version}/example/etc/**"/>
-            <include name="solr-@{solr.version}/example/resources/**"/>
-            <include name="solr-@{solr.version}/example/solr/**"/>
-          </patternset>
-          <mapper>
-            <globmapper from="solr-@{solr.version}/example/*" to="*"/>
-          </mapper>
-        </unzip>
-
-        <ivy:resolve conf="solr.jetty" log="download-only"/>
-        <ivy:retrieve conf="solr.jetty" pattern="@{solr.dir}/lib/[artifact]-[revision].[ext]"/>
-        <move tofile="@{solr.dir}/lib/servlet-api-3.0.jar" overwrite="true">
-          <fileset dir="@{solr.dir}/lib" includes="javax.servlet-3.0.0*"/>
-        </move>
-
-        <ivy:resolve conf="solr.start" log="download-only"/>
-        <ivy:retrieve conf="solr.start" pattern="@{solr.dir}/[artifact].[ext]"/>
-
-        <ivy:resolve conf="solr.logging" log="download-only"/>
-        <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
-
-        <mkdir dir="${solr.extra.libs}"/>
-        <mkdir dir="@{solr.dir}/${solr.sharedlib.dir}"/>
-        <copy todir="@{solr.dir}/${solr.sharedlib.dir}">
-          <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
-          <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
-          <fileset dir="${lib.dir}/jetty" includes="*"/>
-          <fileset dir="${lib.dir}/runtime" includes="*"/>
-        </copy>
-        
-        <delete dir="${build.dir}/solr-war"/>
-        <mkdir dir="${build.dir}/solr-war"/>
-        <unwar src="@{solr.dir}/webapps/solr.war" dest="${build.dir}/solr-war">
-          <patternset>
-            <include name="**/*"/>
-          </patternset>
-        </unwar>
-        
-        <delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>
-        <copy todir="${build.dir}/solr-war/WEB-INF/lib">
-          <fileset dir="${lib.dir}/runtime" includes="commons-io-2.4.jar"/>
-        </copy>
-        <war destfile="${build.dir}/solr-war/solr.war" webxml="${build.dir}/solr-war/WEB-INF/web.xml">
-          <fileset dir="${build.dir}/solr-war">
-            <include name="**/*" />
-          </fileset>
-        </war>
-        <move tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
-          <fileset file="${build.dir}/solr-war/solr.war"/>
-        </move>
-        
-        <!--<jar destfile="@{solr.dir}/webapps/solr.war" update="true" >
-          <zipfileset dir="${solr.extra.libs}" includes="*.jar" prefix="WEB-INF/lib" />
-        </jar>-->
-
-      </sequential>
-    </macrodef>
-  
-  
-  <macrodef name="my-prep-solr">
-    <attribute name="solr.unpack.dir"/>
+    <attribute name="solr.dir"/>
     <attribute name="solr.version"/>
     <sequential>
       <echo>Unpacking Solr @{solr.version} into @{solr.dir} from module ${ant.project.name}</echo>
 
-      <mkdir dir="@{solr.unpack.dir}"/>
-      <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.unpack.dir}">
+      <ivy:resolve conf="solr.war" log="download-only"/>
+      <ivy:retrieve conf="solr.war" type="war" pattern="@{solr.dir}/webapps/[artifact].[ext]"/>
+
+      <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.dir}">
         <patternset>
           <include name="solr-@{solr.version}/example/contexts/**"/>
-          <include name="solr-@{solr.version}/example/**"/>
           <include name="solr-@{solr.version}/example/etc/**"/>
           <include name="solr-@{solr.version}/example/resources/**"/>
           <include name="solr-@{solr.version}/example/solr/**"/>
-          <include name="solr-@{solr.version}/example/start.jar"/>
         </patternset>
         <mapper>
           <globmapper from="solr-@{solr.version}/example/*" to="*"/>
         </mapper>
       </unzip>
-      
+
       <ivy:resolve conf="solr.jetty" log="download-only"/>
       <ivy:retrieve conf="solr.jetty" pattern="@{solr.dir}/lib/[artifact]-[revision].[ext]"/>
       <move tofile="@{solr.dir}/lib/servlet-api-3.0.jar" overwrite="true">
         <fileset dir="@{solr.dir}/lib" includes="javax.servlet-3.0.0*"/>
       </move>
-      
+
       <ivy:resolve conf="solr.start" log="download-only"/>
       <ivy:retrieve conf="solr.start" pattern="@{solr.dir}/[artifact].[ext]"/>
 
       <ivy:resolve conf="solr.logging" log="download-only"/>
       <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
 
-      <mkdir dir="@{solr.unpack.dir}/${solr.sharedlib.dir}"/>
-      <copy todir="@{solr.unpack.dir}/${solr.sharedlib.dir}">
+      <mkdir dir="${solr.extra.libs}"/>
+      <mkdir dir="@{solr.dir}/${solr.sharedlib.dir}"/>
+      <copy todir="@{solr.dir}/${solr.sharedlib.dir}">
         <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
         <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
         <fileset dir="${lib.dir}/jetty" includes="*"/>
         <fileset dir="${lib.dir}/runtime" includes="*"/>
       </copy>
       
-      <delete dir="${solr.dir}/solr-war"/>
-      <mkdir dir="${solr.dir}/solr-war"/>
-      <unwar src="@{solr.unpack.dir}/webapps/solr.war" dest="${solr.dir}/solr-war">
+      <delete dir="${build.dir}/solr-war"/>
+      <mkdir dir="${build.dir}/solr-war"/>
+      <unwar src="@{solr.dir}/webapps/solr.war" dest="${build.dir}/solr-war">
         <patternset>
           <include name="**/*"/>
         </patternset>
       </unwar>
-      <delete file="${solr.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>
-      <copy todir="${solr.dir}/solr-war/WEB-INF/lib">
-        <fileset dir="${lib.dir}/runtime" includes="commons-io-2.4.jar"/>
+      
+      <!--<delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>-->
+      <copy todir="${build.dir}/solr-war/WEB-INF/lib">
+        <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
+        <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
       </copy>
-      <war destfile="${solr.dir}/solr-war/solr.war" webxml="${solr.dir}/solr-war/WEB-INF/web.xml">
-        <fileset dir="${solr.dir}/solr-war">
+      <war destfile="${build.dir}/solr-war/solr.war" webxml="${build.dir}/solr-war/WEB-INF/web.xml">
+        <fileset dir="${build.dir}/solr-war">
           <include name="**/*" />
         </fileset>
       </war>
-      <delete file="@{solr.unpack.dir}/webapps/solr.war" />
-      <copy todir="@{solr.unpack.dir}/webapps">
-        <fileset file="${solr.dir}/solr-war/solr.war"/>
-      </copy>
+      <move tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
+        <fileset file="${build.dir}/solr-war/solr.war"/>
+      </move>
+      
+      <!--<jar destfile="@{solr.dir}/webapps/solr.war" update="true" >
+        <zipfileset dir="${solr.extra.libs}" includes="*.jar" prefix="WEB-INF/lib" />
+      </jar>-->
+
     </sequential>
   </macrodef>
   
-  <target name="patch-solrconfig-check">
-    <available file="${solr.conf.overrides.dir}/solrconfig.xml.patch" property="solrconfig.xml.patch.exists"/>
-    <echo message="checking ${solr.conf.overrides.dir}/solrconfig.xml.patch -> ${solrconfig.xml.patch.exists}"/>
-  </target>
-  
-  <target name="patch-solr-check">
-    <available file="${solr.conf.overrides.dir}/solr.xml.patch" property="solr.xml.patch.exists"/>
-    <echo message="checking ${solr.conf.overrides.dir}/solr.xml.patch -> ${solr.xml.patch.exists}"/>
-  </target>
-
-  <target name="patch-solrconfig-xml" if="solrconfig.xml.patch.exists" depends="patch-solrconfig-check, prep-solr">
-    <exec executable="dos2unix">
-      <arg value="${solr.app.dir}/solr/collection1/conf/solrconfig.xml"/>
-    </exec>
-    <patch
-      patchfile="${solr.conf.overrides.dir}/solrconfig.xml.patch"
-      originalfile="${solr.app.dir}/solr/collection1/conf/solrconfig.xml"
-      ignorewhitespace="true"
-      failonerror="true" />
-  </target>
-  
-  <target name="patch-solr-xml" if="solr.xml.patch.exists" depends="patch-solr-check, prep-solr">
-    <exec executable="dos2unix">
-      <arg value="${solr.run.dir}/solr.xml"/>
-    </exec>
-    <patch
-      patchfile="${solr.conf.overrides.dir}/solr.xml.patch"
-      originalfile="${solr.run.dir}/solr.xml"
-      ignorewhitespace="true"
-      failonerror="true" />
-  </target>
-  
-  <target name="patch-solr" depends="patch-solr-xml, patch-solrconfig-xml">
+  <target name="patch-solr" depends="check-patches-exist, prep-solr">
+    <patch-solr original.file="${solr.dir}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <patch-solr original.file="${solr.dir}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
   </target>
 
   <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr">
     <delete dir="${solr.app.dir}/solr-webapp/webapp"/>
 
-    <java dir="${solr.app.dir}" jar="${solr.app.dir}/start.jar" fork="true" failonerror="true">
+    <java dir="${solr.app.dir}" jar="${solr.app.dir}/jetty-start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
@@ -340,7 +251,7 @@
     </parallel>
   </target>
   
-  <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty">
+  <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty, ivy-resolve-solr-jetty">
     <prep-solr solr.dir="${solr.cloud.dir.1}" solr.version="${solr.server.version}"/>
     <prep-solr solr.dir="${solr.cloud.dir.2}" solr.version="${solr.server.version}"/>
   </target>

@@ -38,9 +38,9 @@
     <dependency org="org.eclipse.jetty" name="jetty-io" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-jmx" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" transitive="false" conf="solr.jetty->default;runtime->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-util" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-util" rev="${jetty.version}" transitive="false" conf="solr.jetty->default;runtime->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-xml" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-start" rev="${jetty.version}" transitive="false" conf="solr.start->default"/>
