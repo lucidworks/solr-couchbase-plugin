@@ -63,19 +63,22 @@ It is required to configure Couchbase buckets to index data from in the solrconf
     <bool name="commitAfterBatch">false</bool>
     <bool name="optimize">false</bool>
   </lst>
-  <lst name="databases">
-    <str name="beer">beer-sample</str>
-    <str name="default">default</str>
-    <str name="test">test</str>
-  </lst>`
-  <lst name="test-fieldmappings">
-    <str name="person">person:/person</str>
-    <str name="name">name:/person/name</str>
-    <str name="age">age_i:/person/age</str>
-    <str name="value">value_i:/value</str>
-  </lst>
-  <lst name="test-splitpath">
-    <str name="test-splitpath">/person|/person/name|/person/age|/value</str>
+  <lst name="bucket">
+    <str name="name">default</str>
+    <str name="splitpath">/</str>
+    <lst name="fieldmappings">
+      <str name="name">name:/name</str>
+      <str name="city">city_s:/city</str>
+      <str name="code">code_s:/code</str>
+      <str name="country">country_s:/country</str>
+      <str name="phone">phone_s:/phone</str>
+      <str name="website">url:/website</str>
+      <str name="type">type_s:/type</str>
+      <str name="updated">last_modified:/updated</str>
+      <str name="description">description:/description</str>
+      <str name="address">address_s:/address</str>
+      <str name="geo">geo_s:/geo</str>
+    </lst>
   </lst>
 </requestHandler>
 ```
@@ -87,16 +90,29 @@ It is required to configure Couchbase buckets to index data from in the solrconf
   - commitAfterBatch - A flag specifying whether this plugin should commit documents to Solr after every batch of documents or when all the documents are retrieved from Couchbase.
   - optimize - Optimize parameter for Solr's commit request.
   
-* databases - a list with names of all bucket names that will be indexed from Couchbase. Only the value of the list element is significant. The name of the element must be unique. Example:
+* bucket - a list with bucket parameters required to perform a synchronisation with Couchbase. Multiple lists of this type are allowed.
+  - name - Bucket name - must be unique
+  - splitpath - a list with paths to the fields in JSON Object on which the original Couchbase JSON document will be split up to extract embedded documents. This is a single String where paths are saparated with "|".
+  - fieldmappings - a list with field names mapping for Couchbase documents, before indexing them into Solr. List element's name must be unique. Value should be `solr_field_name:couchbase_field_path`, where the `couchbase_field_path` is a path to the field in this JSON. Example:
 ```
-<lst name="databases">
-  <str name="beer">beer-sample</str>
-  <str name="default">default</str>
-  <str name="gamesim-sample">gamesim-sample</str>
+<lst name="bucket">
+  <str name="name">default</str>
+  <str name="splitpath">/</str>
+  <lst name="fieldmappings">
+    <str name="name">name:/name</str>
+    <str name="city">city_s:/city</str>
+    <str name="code">code_s:/code</str>
+    <str name="country">country_s:/country</str>
+    <str name="phone">phone_s:/phone</str>
+    <str name="website">url:/website</str>
+    <str name="type">type_s:/type</str>
+    <str name="updated">last_modified:/updated</str>
+    <str name="description">description:/description</str>
+    <str name="address">address_s:/address</str>
+    <str name="geo">geo_s:/geo</str>
+  </lst>
 </lst>
 ```    
-* field mappings - a list with field names mapping for Couchbase documents, before indexing them into Solr. The name of the list must end with suffix *-fieldmapping*. List element's name must be unique. Value should be <solr_field_name>:<couchbase_field_path>. The `*couchbase_field_path*` is a path to the field in this JSON. Example:
-
 Example JSON
 ```
 {
@@ -108,7 +124,7 @@ Example JSON
 }
 ```
 
-Example field mappings:
+Example field mappings for above JSON:
 ```
 <lst name="test-fieldmappings">
   <str name="person">person:/person</str>
@@ -117,14 +133,6 @@ Example field mappings:
   <str name="value">value_i:/value</str>
 </lst>
 ```
-
-* splitpaths - a list with paths to the fields which will be extracted from Couchbase JSON document. This is a single String where paths are saparated with "|". Example:
-
-```
-<lst name="test-splitpath">
-  <str name="test-splitpath">/person|/person/name|/person/age|/value</str>
-</lst>
- ```
 
 
 ## Couchbase XDCR
