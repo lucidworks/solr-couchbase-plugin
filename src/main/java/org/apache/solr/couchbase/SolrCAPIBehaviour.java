@@ -1,4 +1,4 @@
-package com.lucidworks.couchbase;
+package org.apache.solr.couchbase;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,4 +1,4 @@
-package com.lucidworks.couchbase;
+package org.apache.solr.couchbase;
 
 
 public class DefaultTypeSelector implements TypeSelector {

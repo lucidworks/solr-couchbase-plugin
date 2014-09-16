@@ -1,4 +1,4 @@
-package com.lucidworks.couchbase;
+package org.apache.solr.couchbase;
 
 import java.text.DateFormat;
 import java.text.ParseException;
