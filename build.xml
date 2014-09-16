@@ -78,8 +78,6 @@
   </target>
 
   <target name="ivy-report" depends="ivy-init" description="generate Ivy reports for all confs">
-    <!--<fail message="apollo.version not set" unless="${apollo.version}"/>-->
-
     <ivy:resolve conf="*" log="download-only"/>
     <ivy:report conf="*" todir="${build.dir}/ivy-report"/>
   </target>
