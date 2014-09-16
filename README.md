@@ -146,10 +146,10 @@ In Couchbase admin panel, under XDCR tab following settings should be configured
 
 # Running Solr Couchbase Plugin
 
-To run this plugin, simply perform all actions described in Configuration section of this instruction, and run Solr. When solr is started execute GET request to URL
+To run this plugin, simply perform all actions described in Configuration section of this instruction, and run Solr. To run single instance of Solr, execute `ant run-solr` command in the main directory. To run Solr in Cloud mode, execute `ant solr-cloud` command in the main directory. When solr is started execute GET request to URL
 
 ```
-http://<solr_address>/collection1/couchbase?q=start
+http://<solr_address>/solr/collection1/couchbase?action=start
 ```
 
-This will start the plugin, which will register in Couchbase as its replica and the data synchronisation as well as indexing into Solr should start. 
+This will start the plugin, which will register in Couchbase as its replica and the data synchronisation as well as indexing into Solr should start. It assumes that Couchbase server is running and Cross-Datacenter Replication is set as desribed in *Couchbase XDCR* section.c
