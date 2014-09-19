@@ -158,11 +158,9 @@
     <get src="http://ftp.piotrkosoft.net/pub/mirrors/ftp.apache.org/zookeeper/stable/zookeeper-${zk.version}.tar.gz"
       dest="${build-lib.dir}/zookeeper-${zk.version}.tar.gz"/>
   </target>
-
-  <available file="${solr.app.dir}" type="dir" property="solr.prep.skip" />
   
   <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-solr-jetty, ivy-resolve-runtime" >
-    <prep-solr solr.dir="${solr.app.dir}" solr.version="${solr.server.version}"/>
+    <prep-solr solr.dir="${solr.dir}" solr.version="${solr.server.version}"/>
   </target>
   
   <macrodef name="prep-solr">
@@ -242,9 +240,9 @@
   </target>
 
   <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr">
-    <delete dir="${solr.app.dir}/solr-webapp/webapp"/>
+    <delete dir="${solr.dir}/solr-webapp/webapp"/>
 
-    <java dir="${solr.app.dir}" jar="${solr.app.dir}/jetty-start.jar" fork="true" failonerror="true">
+    <java dir="${solr.dir}" jar="${solr.dir}/jetty-start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
@@ -371,6 +369,10 @@
     
   </target>
 
+  <condition property="zk.host.args" value="-DzkHost=localhost:${solr.cloud.zk.port}" else="-DzkRun=localhost:${solr.cloud.zk.port}">
+    <isset property="zk.standalone"/>
+  </condition>
+  
   <target name="run-solr-cloud-1">
     <tstamp>
       <format property="start.time" pattern="yyyy-MM-dd'T'hh:mm:ss"/>
@@ -380,9 +382,10 @@
     <java dir="${solr.cloud.dir.1}" jar="${solr.cloud.dir.1}/jetty-start.jar" fork="true" failonerror="true" output="${solr.log.1}">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
+      <jvmarg line="${zk.host.args}"/>
       
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
-      <jvmarg line="-Dhost=localhost -DzkHost=localhost:${solr.cloud.zk.port} -DnumShards=${solr.cloud.num.shards} -Dbootstrap_confdir=./solr/collection1/conf -Dcollection.configName=default"/>
+      <jvmarg line="-Dhost=localhost -DnumShards=${solr.cloud.num.shards} -Dbootstrap_confdir=./solr/collection1/conf -Dcollection.configName=default"/>
       <sysproperty key="jetty.port" value="${solr.cloud.port.1}"/>
       <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.1}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
@@ -459,11 +462,18 @@
     <copy tofile="${zk.dir}/conf/zoo.cfg" overwrite="true">
       <fileset dir="${zk.conf.dir}" includes="zoo.cfg"/>
     </copy>
+    <chmod file="${zk.dir}/bin/zkServer.sh" perm="u+x"/>
   </target>
   
   <target name="run-zk" depends="prep-zk" description="Run standalone ZooKeeper server">
     <exec dir="${zk.dir}/bin" executable="./zkServer.sh">
       <arg value="start"/>
+    </exec>
+  </target>
+  
+  <target name="stop-zk" depends="" description="Stop standalone ZooKeeper server">
+    <exec dir="${zk.dir}/bin" executable="./zkServer.sh">
+      <arg value="stop"/>
     </exec>
   </target>
 </project>
