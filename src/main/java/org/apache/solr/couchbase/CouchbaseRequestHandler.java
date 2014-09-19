@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.solr.cloud.ElectionContext;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -23,6 +24,9 @@ import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +53,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private static SolrZkClient zkClient;
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
+  private ElectionWatcher electionWatcher;
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
@@ -159,7 +164,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   }
   
   public void checkIfIamLeader() {
-    //at first, check if I am the first leader, which shoudld start Couchbase replica
+    //at first, check if I am the first shard leader, which shoudld start Couchbase replica
     zkStateReader = new ZkStateReader(getZkClient());
     try {
       zkStateReader.updateClusterState(true);
@@ -178,9 +183,21 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       LOG.error("Could not get leader!", e);
     }
     final String coreNodeName = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
-    //if I am leader
-    if(replica != null && coreNodeName != null && replica.getName().equals(coreNodeName)) {
+    if(replica != null && coreNodeName != null && replica.getName().equals(coreNodeName)) { // I am the leader
       startCouchbaseReplica();
+    } else { // I'm not the leader, watch leader.
+      String watchedNode = "/collections/" + collection + "/leaders/shard1";
+      electionWatcher = new ElectionWatcher(coreNodeName, watchedNode);
+      try {
+        zkClient.getData(watchedNode, electionWatcher, null, true);
+      } catch (KeeperException e) {
+        LOG.warn("Failed setting watch", e);
+        // we couldn't set our watch - the node before us may already be down?
+        // we need to check if we are the leader again
+        checkIfIamLeader();
+      } catch (InterruptedException e) {
+        LOG.warn("Failed setting watch", e);
+      }
     }
   }
   
@@ -252,5 +269,45 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
 
   public String getPassword() {
     return password;
+  }
+  
+  private class ElectionWatcher implements Watcher {
+    
+    final String myNode,watchedNode;
+    private boolean canceled = false;
+    
+    private ElectionWatcher(String myNode, String watchedNode) {
+      this.myNode = myNode;
+      this.watchedNode = watchedNode;
+    }
+    
+    void cancel(String leaderSeqPath){
+      canceled = true;
+    }
+    
+    @Override
+    public void process(WatchedEvent event) {
+      if (EventType.None.equals(event.getType())) {
+        return;
+      }
+      if (canceled) {
+        LOG.info("This watcher is not active anymore {}", myNode);
+        try {
+          zkClient.delete(myNode, -1, true);
+        } catch (KeeperException.NoNodeException nne) {
+          // expected . don't do anything
+        } catch (Exception e) {
+          LOG.warn("My watched node still exists and can't remove " + myNode, e);
+        }
+        return;
+      }
+      try {
+        // am I the next leader?
+        checkIfIamLeader();
+      } catch (Exception e) {
+        LOG.warn("", e);
+      }
+    }
+    
   }
 }

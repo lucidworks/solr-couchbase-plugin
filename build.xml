@@ -252,6 +252,7 @@
   <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty, ivy-resolve-solr-jetty">
     <prep-solr solr.dir="${solr.cloud.dir.1}" solr.version="${solr.server.version}"/>
     <prep-solr solr.dir="${solr.cloud.dir.2}" solr.version="${solr.server.version}"/>
+    <prep-solr solr.dir="${solr.cloud.dir.3}" solr.version="${solr.server.version}"/>
   </target>
   
   <macrodef name="patch-solr">
@@ -281,8 +282,10 @@
   <target name="patch-solr-cloud" if="patches.exist" depends="check-patches-exist, prep-solr-cloud">
     <patch-solr original.file="${solr.cloud.dir.1}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
     <patch-solr original.file="${solr.cloud.dir.2}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <patch-solr original.file="${solr.cloud.dir.3}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
     <patch-solr original.file="${solr.cloud.dir.1}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
     <patch-solr original.file="${solr.cloud.dir.2}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.cloud.dir.3}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
   </target>
   
   
@@ -290,6 +293,7 @@
     <parallel>
       <antcall target="run-solr-cloud-1"/>
       <antcall target="run-solr-cloud-2"/>
+      <!--<antcall target="run-solr-cloud-3"/>-->
 
       <!-- Wait for 120 seconds for each to come up -->
       <sequential>
@@ -364,7 +368,7 @@
       <jvmarg line="-Xmx${heap.size}"/>
       
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
-      <jvmarg line="-Dhost=localhost -DzkRun=localhost:${solr.cloud.zk.port} -DnumShards=2 -Dbootstrap_confdir=./solr/collection1/conf -Dcollection.configName=default"/>
+      <jvmarg line="-Dhost=localhost -DzkHost=localhost:${solr.cloud.zk.port} -DnumShards=${solr.cloud.num.shards} -Dbootstrap_confdir=./solr/collection1/conf -Dcollection.configName=default"/>
       <sysproperty key="jetty.port" value="${solr.cloud.port.1}"/>
       <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.1}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
@@ -384,9 +388,28 @@
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5006,suspend=n"/>
-      <jvmarg line="-Dhost=localhost -DzkHost=localhost:${solr.cloud.zk.port} -DnumShards=2"/>
+      <jvmarg line="-Dhost=localhost -DzkHost=localhost:${solr.cloud.zk.port} -DnumShards=${solr.cloud.num.shards}"/>
       <sysproperty key="jetty.port" value="${solr.cloud.port.2}"/>
       <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.2}"/>
+      <sysproperty key="STOP.KEY" value="srsly.stop"/>
+    </java>
+  </target>
+  
+  <target name="run-solr-cloud-3">
+    <sleep seconds="30"/>
+    <!-- Give the leader a head start -->
+    <tstamp>
+      <format property="start.time" pattern="yyyy-MM-dd'T'hh:mm:ss"/>
+    </tstamp>
+    <property name="solr.log.3" location="${solr.cloud.dir.3}/solr-${start.time}.log"/>
+    <echo message="Starting SolrCloud 3 on ${solr.cloud.port.3}, logging to ${solr.log.3}"/>
+    <java dir="${solr.cloud.dir.3}" jar="${solr.cloud.dir.3}/jetty-start.jar" fork="true" failonerror="true" output="${solr.log.3}">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <jvmarg line="-Xmx${heap.size}"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5007,suspend=n"/>
+      <jvmarg line="-Dhost=localhost -DzkHost=localhost:${solr.cloud.zk.port} -DnumShards=${solr.cloud.num.shards}"/>
+      <sysproperty key="jetty.port" value="${solr.cloud.port.3}"/>
+      <sysproperty key="STOP.PORT" value="${solr.cloud.stop.port.3}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
     </java>
   </target>
@@ -416,5 +439,4 @@
       <sleep seconds="20"/>
       <antcall target="test-zk"/>
   </target>
-  
 </project>
