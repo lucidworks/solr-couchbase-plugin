@@ -87,6 +87,10 @@
     <delete dir="${lib.dir}" />
   </target>
   
+  <target name="clean-build-lib">
+    <delete dir="${build-lib.dir}"/>
+  </target>
+    
   <target name="clean-solr" description="Cleans solr/ directory with exception for solr/dist/">
     <delete>
       <fileset dir="${solr.dir}">
@@ -135,14 +139,24 @@
   </target>
   
   <target name="solr-check">
-    <mkdir dir="${solr.dir}/dist" />
-    <available file="${solr.dir}/dist/solr-${solr.server.version}.zip" property="solrzip.exists"/>
+    <mkdir dir="${build-lib.dir}"/>
+    <available file="${build-lib.dir}/solr-${solr.server.version}.zip" property="solrzip.exists"/>
     <echo>solrzip.exists=${solrzip.exists}</echo>
   </target>
 
   <target name="get-solr" unless="solrzip.exists" depends="solr-check">
     <get src="http://archive.apache.org/dist/lucene/solr/${solr.server.version}/solr-${solr.server.version}.zip"
-                dest="${solr.dir}/dist/solr-${solr.server.version}.zip"/>
+                dest="${build-lib.dir}/solr-${solr.server.version}.zip"/>
+  </target>
+  
+  <target name="zk-check">
+    <available file="${build-lib.dir}/zookeeper-${zk.version}.tar.gz" property="zk.tar.exists"/>
+    <echo>zk.tar.exists=${zk.tar.exists}</echo>
+  </target>
+  
+  <target name="get-zk" unless="zk.tar.exists" depends="zk-check">
+    <get src="http://ftp.piotrkosoft.net/pub/mirrors/ftp.apache.org/zookeeper/stable/zookeeper-${zk.version}.tar.gz"
+      dest="${build-lib.dir}/zookeeper-${zk.version}.tar.gz"/>
   </target>
 
   <available file="${solr.app.dir}" type="dir" property="solr.prep.skip" />
@@ -160,7 +174,7 @@
       <ivy:resolve conf="solr.war" log="download-only"/>
       <ivy:retrieve conf="solr.war" type="war" pattern="@{solr.dir}/webapps/[artifact].[ext]"/>
 
-      <unzip src="${solr.dir}/dist/solr-@{solr.version}.zip" dest="@{solr.dir}">
+      <unzip src="${build-lib.dir}/solr-@{solr.version}.zip" dest="@{solr.dir}">
         <patternset>
           <include name="solr-@{solr.version}/example/contexts/**"/>
           <include name="solr-@{solr.version}/example/etc/**"/>
@@ -438,5 +452,18 @@
   <target name="wait-and-test-zk">
       <sleep seconds="20"/>
       <antcall target="test-zk"/>
+  </target>
+  
+  <target name="prep-zk" depends="get-zk, init">
+    <untar src="${build-lib.dir}/zookeeper-${zk.version}.tar.gz" dest="${build.dir}" compression="gzip"/>
+    <move tofile="${zk.dir}/conf/zoo.cfg" overwrite="true">
+      <fileset dir="${zk.conf.dir}" includes="zoo.cfg"/>
+    </move>
+  </target>
+  
+  <target name="run-zk" depends="prep-zk" description="Run standalone ZooKeeper server">
+    <exec dir="${zk.dir}/bin" executable="./zkServer.sh">
+      <arg value="start"/>
+    </exec>
   </target>
 </project>
