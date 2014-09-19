@@ -456,9 +456,9 @@
   
   <target name="prep-zk" depends="get-zk, init">
     <untar src="${build-lib.dir}/zookeeper-${zk.version}.tar.gz" dest="${build.dir}" compression="gzip"/>
-    <move tofile="${zk.dir}/conf/zoo.cfg" overwrite="true">
+    <copy tofile="${zk.dir}/conf/zoo.cfg" overwrite="true">
       <fileset dir="${zk.conf.dir}" includes="zoo.cfg"/>
-    </move>
+    </copy>
   </target>
   
   <target name="run-zk" depends="prep-zk" description="Run standalone ZooKeeper server">
