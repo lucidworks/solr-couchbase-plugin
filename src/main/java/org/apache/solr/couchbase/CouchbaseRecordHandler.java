@@ -30,11 +30,16 @@ public class CouchbaseRecordHandler implements Handler{
   @Override
   public void handle(Map<String, Object> record, String path) {
     SolrInputDocument solrDoc = doc.deepCopy();
+    Map<String,String> mapping = SolrUtils.mapToSolrDynamicFields(record);
     if(!path.equals("/")) {
       solrDoc.setField(CommonConstants.ID_FIELD, (String)doc.getFieldValue(CommonConstants.ID_FIELD) + "-" + seq);
       seq++;
     }
     for(Map.Entry<String, Object> entry : record.entrySet()) {
+      String key = entry.getKey();
+      if(mapping.containsKey(key)) {
+        key = mapping.get(key);
+      }
       if(entry.getKey().equals("last_modified")) {
         DateFormat formatter = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss");
         Date date = null;
@@ -43,9 +48,9 @@ public class CouchbaseRecordHandler implements Handler{
         } catch (ParseException e) {
           LOG.error("Solr Couchbase plugin could not parse date", e);
         }
-        solrDoc.setField(entry.getKey(), date);
+        solrDoc.setField(key, date);
       } else {
-        solrDoc.addField(entry.getKey(), entry.getValue());
+        solrDoc.addField(key, entry.getValue());
       }
     }
     if((boolean)doc.getFieldValue(CommonConstants.DELETED_FIELD)) {

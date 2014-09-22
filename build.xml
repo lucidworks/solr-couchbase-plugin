@@ -12,7 +12,7 @@
 
 
 
-  <target name="ivy-download" unless="ivy.jar.exists">
+  <target name="ivy-download" depends="init" unless="ivy.jar.exists">
     <get src="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.version}/ivy-${ivy.version}.jar"
          dest="${build-lib.dir}/ivy-${ivy.version}.jar"
          usetimestamp="true"/>
@@ -103,6 +103,7 @@
   <target name="init">
     <mkdir dir="${build.dir}" />
     <mkdir dir="${lib.dir}"/>
+    <mkdir dir="${build-lib.dir}"/>
   </target>
   
   <target name="compile" depends="ivy-resolve-compile">
@@ -476,4 +477,5 @@
       <arg value="stop"/>
     </exec>
   </target>
+  
 </project>
