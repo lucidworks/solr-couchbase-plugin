@@ -144,6 +144,10 @@ In Couchbase admin panel, under XDCR tab following settings should be configured
 * Replication - Click on 'Create Replication' button. Select a Couchbase Cluster and a Bucket to replicate from. Select configured Solr's Plugin Remote Cluster and add a Bucket name. This Bucket name must match the name specified in *databases*, *fieldmappings* and *splitpaths* in the solrconfig.xml file. Under *Advaced settings* field 'XDCR Prootcol' should be set to 'Version 1' value.
 
 
+# Multiple collections
+
+To sunchronize documents from Couchbase to multiple Solr collections, each collection needs to have this plugin configured in it's solrconfig.xml file and also a replication in Couchbase created. Each collection plugin must be started manually. If this is done, there will be one Couchbase replica running for each Solr collection.
+
 # Running Solr Couchbase Plugin
 
 To run this plugin, simply perform all actions described in Configuration section of this instruction, and run Solr. To run single instance of Solr, execute `ant run-solr` command in the main directory. To run Solr in Cloud mode, execute `ant solr-cloud` command in the main directory. When solr is started execute GET request to URL
