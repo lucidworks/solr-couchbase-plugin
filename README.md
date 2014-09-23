@@ -152,4 +152,4 @@ To run this plugin, simply perform all actions described in Configuration sectio
 http://<solr_address>/solr/collection1/couchbase?action=start
 ```
 
-This will start the plugin, which will register in Couchbase as its replica and the data synchronisation as well as indexing into Solr should start. It assumes that Couchbase server is running and Cross-Datacenter Replication is set as desribed in *Couchbase XDCR* section.c
+This will start the plugin, which will register in Couchbase as its replica and the data synchronisation as well as indexing into Solr should start. It assumes that Couchbase server is running and Cross-Datacenter Replication is set as described in *Couchbase XDCR* section of this document.
