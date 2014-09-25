@@ -64,7 +64,6 @@
     <dependency org="org.noggit" name="noggit" rev="0.6" conf="compile->default"/>
     <!-- jUnit -->
     <dependency org="junit" name="junit" rev="4.11" conf="compile->default"/>
-    
     <!-- other -->
     <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="runtime->default"/>
     <dependency org="commons-io" name="commons-io" rev="2.4" conf="compile->default;runtime->default"/>

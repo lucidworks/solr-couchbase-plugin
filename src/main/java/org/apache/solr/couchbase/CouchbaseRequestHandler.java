@@ -1,4 +1,8 @@
 package org.apache.solr.couchbase;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -6,7 +10,25 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.solr.cloud.ElectionContext;
+import org.apache.http.Consts;
+import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.StatusLine;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -27,6 +49,11 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import org.noggit.JSONParser;
+import org.noggit.ObjectBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +65,14 @@ import com.couchbase.capi.CouchbaseBehavior;
 public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrCoreAware {
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
+  private static final String CLUSTER_NAME = "solr-";
+  private static final String CLUSTERS_URI = "/pools/default/remoteClusters";
   
   private CouchbaseBehavior couchbaseBehaviour;
   private CAPIBehavior capiBehaviour;
   private CAPIServer server;
   private String host = "127.0.0.1";
-  private int port;
+  private int port = -1;
   private String username;
   private String password;
   private TypeSelector typeSelector;
@@ -54,6 +83,12 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
   private ElectionWatcher electionWatcher;
+  private List<String> couchbaseServersList;
+  private String clusterName;
+  private CloseableHttpClient httpClient;
+  private HttpClientContext httpContext;
+  private ObjectMapper mapper = new ObjectMapper();
+  private ArrayList<String> clusterNames;
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
@@ -95,12 +130,19 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   @Override
   public void init(NamedList args) {
     super.init(args);
-    Map<String,String> params = SolrParams.toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
-    username = params.get(CommonConstants.USERNAME_FIELD);
-    password = params.get(CommonConstants.PASSWORD_FIELD);
-    port = Integer.parseInt(params.get(CommonConstants.PORT_FIELD));
-    commitAfterBatch = Boolean.parseBoolean(params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD));
-    
+    Map<String,Object> params = toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
+    username = params.get(CommonConstants.USERNAME_FIELD).toString();
+    password = params.get(CommonConstants.PASSWORD_FIELD).toString();
+    port = (int)params.get(CommonConstants.PORT_FIELD);
+    commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
+    couchbaseServersList = new ArrayList<String>(SolrParams.toMap((NamedList)params.get(CommonConstants.COUCHBASE_SERVERS_MARK)).values());
+    if(couchbaseServersList == null) {
+      LOG.error("No Couchbase servers configured!");
+    }
+    clusterName = (String) params.get(CommonConstants.CLUSTER_NAME_MARK);
+    if(clusterName == null) {
+      clusterName = "default";
+    }
     List<NamedList<Object>> bucketslist = args.getAll(CommonConstants.BUCKET_MARK);
     for(NamedList<Object> bucket : bucketslist) {
       String name = (String)bucket.get(CommonConstants.NAME_FIELD);
@@ -110,6 +152,13 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       Bucket b = new Bucket(name, splitpath, fieldmappings);
       buckets.put(name, b);
     }
+    //configure Couchbase REST client
+    CredentialsProvider credsProvider = new BasicCredentialsProvider();
+    for(String host : couchbaseServersList) {
+      credsProvider.setCredentials(new AuthScope(null, -1, null),
+          new UsernamePasswordCredentials(username, password));
+    }
+    httpClient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
   }
   
   @Override
@@ -160,7 +209,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   }
   
   public void handleStop() {
-    stopCouchbasePlugin();
+    stopCouchbaseReplica();
   }
   
   public void checkIfIamLeader() {
@@ -201,6 +250,146 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
   }
   
+  public ArrayList<Map<String,Object>> checkRemoteClusters() {
+    int i = 0;
+    CloseableHttpResponse response = null;
+    ArrayList<Map<String,Object>> responseArray = null;
+    try {
+      URI clustersUri = new URIBuilder().setScheme("http")
+          .setHost(couchbaseServersList.get(0))
+          .setPath(CLUSTERS_URI).build();
+      HttpGet getClusters = new HttpGet(clustersUri);
+      response = httpClient.execute(getClusters);
+      HttpEntity entity = response.getEntity();
+      if (entity != null) {
+          long len = entity.getContentLength();
+          String data = EntityUtils.toString(entity);
+          responseArray = (ArrayList<Map<String, Object>>) ObjectBuilder.fromJSON(data);
+      }
+    } catch (URISyntaxException e) {
+      LOG.error("Could not create Couchbase clusters URI", e);
+    } catch (ClientProtocolException e) {
+      LOG.error("Client Protocol Exception", e);
+    } catch (IOException e) {
+      LOG.error("IOException", e);
+    } finally {
+      try {
+        if(response != null) {
+          response.close();
+        }
+      } catch (IOException e) {
+        LOG.error("Could not close HTTP response", e);
+      }
+    }
+    return responseArray;
+  }
+  
+  public boolean createRemoteCluster() {
+    CloseableHttpResponse response = null;
+    Map<String,Object> json = null;
+    boolean success = false;
+    int number = 0;
+    String clusterName = "";
+    for(;;) {
+      if(!clusterNames.contains(CLUSTER_NAME + number)) {
+        clusterName = CLUSTER_NAME + number;
+        break;
+      }
+      number++;
+    }
+    try {
+      List<NameValuePair> formparams = new ArrayList<NameValuePair>();
+      formparams.add(new BasicNameValuePair("uuid", couchbaseBehaviour.getPoolUUID(null)));
+      formparams.add(new BasicNameValuePair("name", clusterName));
+      formparams.add(new BasicNameValuePair("hostname", host + ":" + port));
+      formparams.add(new BasicNameValuePair("username", username));
+      formparams.add(new BasicNameValuePair("password", password));
+      UrlEncodedFormEntity reqEntity = new UrlEncodedFormEntity(formparams);
+      URI clustersUri = new URIBuilder().setScheme("http")
+          .setHost(couchbaseServersList.get(0))
+          .setPath(CLUSTERS_URI)
+          .build();
+      String url = "http://" + couchbaseServersList.get(0) + CLUSTERS_URI + "?" + "uuid=" + couchbaseBehaviour.getPoolUUID(null) + "&name=" + clusterName + "&hostname="+ host + ":" + port + "&username=" + username + "&password=" + password; 
+//      HttpPost httppost = new HttpPost(clustersUri);
+//      httppost.setEntity(reqEntity);
+      HttpPost httppost = new HttpPost(url);
+      response = httpClient.execute(httppost);
+      int statusCode = response.getStatusLine().getStatusCode();
+      HttpEntity entity = response.getEntity();
+      if (entity != null) {
+          long len = entity.getContentLength();
+          String data = EntityUtils.toString(entity);
+          json = (Map<String, Object>) ObjectBuilder.fromJSON(data);
+          if(!(boolean) json.get("deleted")) {
+            success = true;
+          }
+      }
+    } catch (URISyntaxException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (ClientProtocolException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    } finally {
+      try {
+        if(response != null) {
+          response.close();
+        }
+      } catch (IOException e) {
+        LOG.error("Could not close HTTP response", e);
+      }
+    }
+    return success;
+  }
+  
+  public void configureXDCR() {
+    //Check remote clusters in Couchbase
+    ArrayList<Map<String,Object>> clusters = checkRemoteClusters();
+    //check if this CAPIServer is Configured in Couchbase
+    boolean configured = false;
+    clusterNames = new ArrayList<String>();
+    if(port != -1) {
+      for(Map<String,Object> cluster : clusters) {
+        String hostname = (String) cluster.get("hostname");
+        String name = (String) cluster.get("name");
+        clusterNames.add(name);
+        if(hostname == null) {
+          continue;
+        } else {
+          String[] splits = hostname.split(":");
+          if(host.equals(splits[0]) && port == Integer.parseInt(splits[1])) {
+            //This CAPIServer is configured in Couchbase
+            if(false == (Boolean)cluster.get("deleted")) {
+              configured = true;
+            }
+          }
+        }
+      }
+    }
+    if(!configured) {
+      createRemoteCluster();
+    }
+  }
+  
+  public static int checkPort(int port) {
+    ServerSocket s = null;
+    for(;;) {
+      try {
+        s = new ServerSocket(port);
+        s.close();
+        break;
+      } catch (IOException e) {
+        //port occupied, find another one
+        port++;
+      }
+    }
+    
+    return port;
+  }
+  
   public void startCouchbaseReplica() {
     settings = new Settings();
     this.documentTypeParentFields = settings.getByPrefix("couchbase.documentTypeParentFields.");
@@ -217,6 +406,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     typeSelector = new DefaultTypeSelector();
     typeSelector.configure(settings);
     couchbaseBehaviour = new SolrCouchbaseBehaviour(this);
+    port = checkPort(port);
     capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
     server = new CAPIServer(capiBehaviour, couchbaseBehaviour, port, username, password);
     //TODO fix this
@@ -227,9 +417,10 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
     port = server.getPort();
     LOG.info(String.format("CAPIServer started on port %d", port));
+//    configureXDCR();
   }
   
-  public void stopCouchbasePlugin() {
+  public void stopCouchbaseReplica() {
     if(server != null) {
       try {
         server.stop();
@@ -269,6 +460,15 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
 
   public String getPassword() {
     return password;
+  }
+  
+  /** Create a Map&lt;String,Object&gt; from a NamedList given no keys are repeated */
+  public static Map<String,Object> toMap(NamedList params) {
+    HashMap<String,Object> map = new HashMap<>();
+    for (int i=0; i<params.size(); i++) {
+      map.put(params.getName(i), params.getVal(i));
+    }
+    return map;
   }
   
   private class ElectionWatcher implements Watcher {

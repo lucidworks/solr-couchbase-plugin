@@ -10,9 +10,11 @@ import com.couchbase.capi.CouchbaseBehavior;
 public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
 
   CouchbaseRequestHandler handler;
+  String poolUUID;
   
   public SolrCouchbaseBehaviour(CouchbaseRequestHandler handler) {
     this.handler = handler;
+    poolUUID = Utils.randomID();
   }
   
   public List<String> getPools() {
@@ -22,7 +24,7 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   }
 
   public String getPoolUUID(String pool) {
-      return "00000000000000000000000000000000";
+      return poolUUID;
   }
   
   public Map<String, Object> getPoolDetails(String pool) {

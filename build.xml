@@ -295,13 +295,12 @@
   <target name="patch-solr-cloud" if="patches.exist" depends="check-patches-exist, prep-solr-cloud">
     <patch-solr original.file="${solr.cloud.dir.1}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
     <patch-solr original.file="${solr.cloud.dir.2}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
-    <patch-solr original.file="${solr.cloud.dir.3}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <!--<patch-solr original.file="${solr.cloud.dir.3}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>-->
     <patch-solr original.file="${solr.cloud.dir.1}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
     <patch-solr original.file="${solr.cloud.dir.2}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
-    <patch-solr original.file="${solr.cloud.dir.3}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <!--<patch-solr original.file="${solr.cloud.dir.3}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>-->
   </target>
-  
-  
+
   <target name="solr-cloud" depends="prep-solr-cloud, patch-solr-cloud" description="Install and run interactively SolrCloud cluster">
     <parallel>
       <antcall target="run-solr-cloud-1"/>
@@ -329,7 +328,7 @@
       </sequential>
     </parallel>
   </target>
-  
+
   <!-- Stop two node SolrCloud cluster -->
   <target name="stop-solr-cloud">
     <!-- Stop second server -->
