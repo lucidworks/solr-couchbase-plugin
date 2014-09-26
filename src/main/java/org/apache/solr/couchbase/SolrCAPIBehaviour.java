@@ -189,6 +189,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     }) {};
     // keep a map of the id - rev for building the response
     List<Object> bulkDocsResult = new ArrayList<Object>();
+    Map<String,String> revisions = new HashMap<String, String>();
     
     if(handler.getBucket(bucketName) != null) {
 
@@ -248,7 +249,6 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
           }
           
           boolean deleted = meta.containsKey("deleted") ? (Boolean)meta.get("deleted") : false;
-          solrDoc.addField(CommonConstants.DELETED_FIELD, deleted);
           
           if(!deleted) {
             String parentField = null;
@@ -277,20 +277,31 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
                     LOG.warn("Unable to determine routing value from routing field {} for doc id {}", routingField, id);
                 }
             }
-          }
-          
-          //extract and map json fields
-          JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
-              new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
-          if(jsonString == null) {
-            jsonString="";
-          }
-          JSONParser parser = new JSONParser(jsonString);
-          Handler handler = new CouchbaseRecordHandler(this, req, solrDoc, bulkDocsResult);
-          try {
-            rr.streamRecords(parser, handler);
-          } catch (IOException e) {
-            LOG.error("Cannot parse Couchbase record!", e);
+            
+            //extract and map json fields
+            JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
+                new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
+            if(jsonString == null) {
+              jsonString="";
+            }
+            JSONParser parser = new JSONParser(jsonString);
+            Handler handler = new CouchbaseRecordHandler(this, req, solrDoc, bulkDocsResult);
+            try {
+              rr.streamRecords(parser, handler);
+            } catch (IOException e) {
+              LOG.error("Cannot parse Couchbase record!", e);
+            }
+          } else { //document deleted
+            boolean success = deleteDoc(id, req);
+            if(success) {
+              Map<String, Object> itemResponse = new HashMap<String, Object>();
+              itemResponse.put("id", id);
+              itemResponse.put("rev", rev);
+              if(!rev.equals(revisions.get(id))) {
+                revisions.put(id, rev);
+                bulkDocsResult.add(itemResponse);
+              }
+            }
           }
         }
         if(commitAfterBatch && bulkDocsResult.size() > 0) {

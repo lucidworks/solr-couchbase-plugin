@@ -61,11 +61,7 @@ public class CouchbaseRecordHandler implements Handler{
     }
     
     boolean success = false;
-    if((boolean)doc.getFieldValue(CommonConstants.DELETED_FIELD)) {
-      success = capiBehaviour.deleteDoc(solrDoc.getFieldValue(CommonConstants.ID_FIELD), req);
-    } else {
-      success = capiBehaviour.addDoc(solrDoc, req);
-    }
+    success = capiBehaviour.addDoc(solrDoc, req);
 
     String itemId = (String) doc.getFieldValue(CommonConstants.ID_FIELD);
     String itemRev = (String) doc.getFieldValue(CommonConstants.REVISION_FIELD);
