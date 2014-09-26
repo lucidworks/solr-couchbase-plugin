@@ -10,12 +10,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.TermQuery;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.JsonRecordReader;
 import org.apache.solr.common.util.JsonRecordReader.Handler;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
+import org.apache.solr.search.DocIterator;
+import org.apache.solr.search.DocSet;
+import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.CommitUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
@@ -120,6 +126,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     long start = System.currentTimeMillis();
     activeBulkDocsRequests.inc();
     
+    SolrIndexSearcher searcher = handler.getCore().getSearcher().get();
     Map<String, Object> responseMap = null;
     
     String bucketName = getBucketNameFromDatabase(database);
@@ -127,10 +134,25 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
       responseMap = new HashMap<String, Object>();
         for (Entry<String, Object> entry : revsMap.entrySet()) {
             String id = entry.getKey();
-            Object revs = entry.getValue();
-            Map<String, Object> rev = new HashMap<String, Object>();
-            rev.put("missing", revs);
-            responseMap.put(id, rev);
+            String revs = (String) entry.getValue();
+            TermQuery query = new TermQuery(new Term(CommonConstants.ID_FIELD, id + "*"));
+            try {
+              DocSet docs = searcher.getDocSet(query, (DocSet)null);
+              DocIterator iterator = docs.iterator();
+              if(docs.size()>0) {
+                while(iterator.hasNext()) {
+                  int docId = iterator.nextDoc();
+                  if(!revs.equals(searcher.doc(docId).get(CommonConstants.REVISION_FIELD))) {
+                    Map<String, Object> rev = new HashMap<String, Object>();
+                    rev.put("missing", revs);
+                    responseMap.put(id, rev);
+                  }
+                }
+              }
+            } catch (IOException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
         }
     }
     long end = System.currentTimeMillis();
@@ -145,7 +167,6 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     activeBulkDocsRequests.inc();
     
     String bucketName = getBucketNameFromDatabase(database);
-    List<Object> result = null;
     SolrQueryRequest req = new SolrQueryRequestBase(handler.getCore(), new SolrParams() {
       
       @Override
@@ -167,11 +188,9 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
       }
     }) {};
     // keep a map of the id - rev for building the response
-    Map<String,String> revisions = new HashMap<String, String>();
+    List<Object> bulkDocsResult = new ArrayList<Object>();
     
     if(handler.getBucket(bucketName) != null) {
-
-        result = new ArrayList<Object>();
 
         for (Map<String, Object> doc : docs) {
 
@@ -208,7 +227,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
 
           String id = (String)meta.get("id");
           String rev = (String)meta.get("rev");
-          revisions.put(id, rev);
+          
           SolrInputDocument solrDoc = new SolrInputDocument();
           solrDoc.addField(CommonConstants.ID_FIELD, id);
           solrDoc.addField(CommonConstants.REVISION_FIELD, rev);
@@ -263,15 +282,18 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
           //extract and map json fields
           JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
               new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
+          if(jsonString == null) {
+            jsonString="";
+          }
           JSONParser parser = new JSONParser(jsonString);
-          Handler handler = new CouchbaseRecordHandler(this, req, solrDoc);
+          Handler handler = new CouchbaseRecordHandler(this, req, solrDoc, bulkDocsResult);
           try {
             rr.streamRecords(parser, handler);
           } catch (IOException e) {
             LOG.error("Cannot parse Couchbase record!", e);
           }
         }
-        if(commitAfterBatch) {
+        if(commitAfterBatch && bulkDocsResult.size() > 0) {
           commit(req);
         }
     } else {
@@ -281,7 +303,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     long end = System.currentTimeMillis();
     meanBulkDocsRequests.inc(end - start);
     activeBulkDocsRequests.dec();
-    return result;
+    return bulkDocsResult;
   }
   
   public Map<String, Object> getDocument(String database, String docId) {
@@ -427,27 +449,30 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   }
   
   boolean addDoc(SolrInputDocument doc, SolrQueryRequest req) {
+    boolean success = false;
     try {
       AddUpdateCommand command = new AddUpdateCommand(req);
       command.solrDoc = doc;
       handler.getProcessor().processAdd(command);
+      success = true;
     } catch (Exception e) {
       LOG.warn("Error creating document : " + doc, e);
-      return false;
     }
-
-    return true;
+    return success;
   }
   
-  void deleteDoc(Object id, SolrQueryRequest req) {
+  public boolean deleteDoc(Object id, SolrQueryRequest req) {
+    boolean success = false;
     try {
       LOG.info("Deleting document:" + id);
       DeleteUpdateCommand delCmd = new DeleteUpdateCommand(req);
       delCmd.setId(id.toString());
       handler.getProcessor().processDelete(delCmd);
+      success = true;
     } catch (IOException e) {
       LOG.error("Exception while deleting doc:" + id, e);
     }
+    return success;
   }
 
   public void commit(SolrQueryRequest req) {

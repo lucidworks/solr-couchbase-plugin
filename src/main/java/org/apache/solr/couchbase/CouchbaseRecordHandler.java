@@ -3,7 +3,10 @@ package org.apache.solr.couchbase;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.common.SolrInputDocument;
@@ -16,15 +19,18 @@ public class CouchbaseRecordHandler implements Handler{
   
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
   
+  List<Object> bulkDocsResult = new ArrayList<Object>();
+  Map<String,String> revisions = new HashMap<String, String>();
   SolrCAPIBehaviour capiBehaviour;
   SolrInputDocument doc;
   SolrQueryRequest req;
   int seq = 1;
   
-  public CouchbaseRecordHandler(SolrCAPIBehaviour capiBehaviour, SolrQueryRequest req, SolrInputDocument doc) {
+  public CouchbaseRecordHandler(SolrCAPIBehaviour capiBehaviour, SolrQueryRequest req, SolrInputDocument doc, List<Object> bulkDocsResult) {
     this.capiBehaviour = capiBehaviour;
     this.doc = doc;
     this.req = req;
+    this.bulkDocsResult = bulkDocsResult;
   } 
   
   @Override
@@ -53,10 +59,25 @@ public class CouchbaseRecordHandler implements Handler{
         solrDoc.addField(key, entry.getValue());
       }
     }
+    
+    boolean success = false;
     if((boolean)doc.getFieldValue(CommonConstants.DELETED_FIELD)) {
-      capiBehaviour.deleteDoc(solrDoc.getFieldValue(CommonConstants.ID_FIELD), req);
+      success = capiBehaviour.deleteDoc(solrDoc.getFieldValue(CommonConstants.ID_FIELD), req);
     } else {
-      capiBehaviour.addDoc(solrDoc, req);
+      success = capiBehaviour.addDoc(solrDoc, req);
+    }
+
+    String itemId = (String) doc.getFieldValue(CommonConstants.ID_FIELD);
+    String itemRev = (String) doc.getFieldValue(CommonConstants.REVISION_FIELD);
+    Map<String, Object> itemResponse = new HashMap<String, Object>();
+    itemResponse.put("id", itemId);
+    itemResponse.put("rev", itemRev);
+    
+    if(success) {
+      if(!itemRev.equals(revisions.get(itemId))) {
+        revisions.put(itemId, itemRev);
+        bulkDocsResult.add(itemResponse);
+      }
     }
   }
 

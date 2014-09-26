@@ -8,7 +8,7 @@
 +    <lst name="params">
 +      <str name="username">admin</str>
 +      <str name="password">admin123</str>
-+      <int name="port">9874</int>
++      <int name="port">9875</int>
 +      <bool name="commitAfterBatch">true</bool>
 +      <lst name="couchbaseServers">
 +        <str name="server1">127.0.0.1:8091</str>
