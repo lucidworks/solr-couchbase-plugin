@@ -93,7 +93,19 @@ It is required to configure Couchbase buckets to index data from in the solrconf
 * bucket - a list with bucket parameters required to perform a synchronisation with Couchbase. Multiple lists of this type are allowed.
   - name - Bucket name - must be unique
   - splitpath - a list with paths to the fields in JSON Object on which the original Couchbase JSON document will be split up to extract embedded documents. This is a single String where paths are saparated with "|".
-  - fieldmappings - a list with field names mapping for Couchbase documents, before indexing them into Solr. List element's name must be unique. Value should be `solr_field_name:couchbase_field_path`, where the `couchbase_field_path` is a path to the field in this JSON. Example:
+  - fieldmappings - a list with field names mapping for Couchbase documents, before indexing them into Solr. List element's name must be unique. At least one field mapping must be provided. Value should be `solr_field_name:couchbase_field_path`. The ‘json-path’ is a required part. 'target-field-name' is the name of the field in the input Solr document.  It is optional and it is automatically derived from the input json.
+  - Wildcards - Instead of specifying all the field names in *fieldmappings* explicitly , it is possible to specify a wildcard '\*' or a wildwildcard '\*\*' to map fields automatically. The constraint is that wild cards can be only used in the end of the json-path. The split path cannot use wildcards. The following are example wildcard path mappings:
+
+Example Wildcards:
+```
+f=/docs/* : maps all the fields under docs and in the name as given in json
+f=/docs/** : maps all the fields under docs and its children in the name as given in json
+f=searchField:/docs/* : maps all fields under /docs to a single field called ‘searchField’
+f=searchField:/docs/** : maps all fields under /docs and its children to searchField 
+```
+
+
+Example Bucket Configuration:
 ```
 <lst name="bucket">
   <str name="name">default</str>
@@ -113,7 +125,9 @@ It is required to configure Couchbase buckets to index data from in the solrconf
   </lst>
 </lst>
 ```    
-Example JSON
+
+
+Example JSON:
 ```
 {
 "person" : { 
