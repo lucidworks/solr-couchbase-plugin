@@ -314,9 +314,13 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       if (entity != null) {
           long len = entity.getContentLength();
           String data = EntityUtils.toString(entity);
-          json = (Map<String, Object>) ObjectBuilder.fromJSON(data);
-          if(!(boolean) json.get("deleted")) {
-            success = true;
+          if(statusCode >= 200 && statusCode <300) {
+            json = (Map<String, Object>) ObjectBuilder.fromJSON(data);
+            if(!(boolean) json.get("deleted")) {
+              success = true;
+            }
+          } else {
+            LOG.error("Remote cluster creation unsuccessful!");
           }
       }
     } catch (URISyntaxException e) {
@@ -412,7 +416,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
     port = server.getPort();
     LOG.info(String.format("CAPIServer started on port %d", port));
-//    configureXDCR();
+    configureXDCR();
   }
   
   public void stopCouchbaseReplica() {
