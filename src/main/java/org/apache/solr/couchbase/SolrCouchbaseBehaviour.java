@@ -24,8 +24,7 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   }
 
   public String getPoolUUID(String pool) {
-//      return poolUUID;
-    return "98b767a67fe74becae1b8b2b10c5236b";
+      return poolUUID;
   }
   
   public Map<String, Object> getPoolDetails(String pool) {
