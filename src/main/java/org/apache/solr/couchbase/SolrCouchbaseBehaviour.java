@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.solr.common.cloud.ZkNodeProps;
+
 import com.couchbase.capi.CouchbaseBehavior;
 
 public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
@@ -53,19 +55,24 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   
   public List<Object> getNodesServingPool(String pool) {
       List<Object> nodes = null;
+      Map<String,ZkNodeProps> capiserversProps = handler.getCollectionsLeaders();
       if("default".equals(pool)) {
-          nodes = new ArrayList<Object>();
+        nodes = new ArrayList<Object>();
+        for(Map.Entry<String, ZkNodeProps> entry : capiserversProps.entrySet()) {
+          String host = entry.getValue().getStr("host");
+          int port = entry.getValue().getInt("port", 9999);
   
           Map<String, Object> nodePorts = new HashMap<String, Object>();
-          nodePorts.put("direct", handler.getPort());
+          nodePorts.put("direct", port);
   
           Map<String, Object> node = new HashMap<String, Object>();
           node.put("couchApiBase",
-                  String.format("http://%s:%s/", handler.getHost(), handler.getPort()));
-          node.put("hostname", handler.getHost() + ":" + handler.getPort());
+                  String.format("http://%s:%s/", host, port));
+          node.put("hostname", host + ":" + port);
           node.put("ports", nodePorts);
   
           nodes.add(node);
+        }
       }
   
       return nodes;

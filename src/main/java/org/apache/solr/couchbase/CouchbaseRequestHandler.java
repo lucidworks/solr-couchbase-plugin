@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -27,9 +28,11 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
@@ -43,6 +46,7 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -62,6 +66,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
   private static final String CLUSTER_NAME = "solr-";
   private static final String CLUSTERS_URI = "/pools/default/remoteClusters";
+  private static final String CAPISERVER_PATH = "/capi_servers";
   
   private CouchbaseBehavior couchbaseBehaviour;
   private CAPIBehavior capiBehaviour;
@@ -84,6 +89,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private HttpClientContext httpContext;
   private ObjectMapper mapper = new ObjectMapper();
   private ArrayList<String> clusterNames;
+  private String collection;
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
@@ -120,6 +126,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
         core.getUpdateProcessingChain("");
     processor = processorChain.createProcessor(req, rsp);
     zkClient = getZkClient();
+    collection = core.getName();
   }
   
   @Override
@@ -261,6 +268,22 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     return port;
   }
   
+  public void createZKCapiServer() {
+    Map<String,Object> properties = new HashMap<String, Object>();
+    properties.put("core", collection);
+    properties.put("node_name", "127.0.0.1:" + port + "_capiserver");
+    properties.put("host", "localhost");
+    properties.put("port", port);
+    
+    ZkNodeProps nodeProps = new ZkNodeProps(properties);
+    try {
+      zkClient.makePath(CAPISERVER_PATH + "/" + properties.get("node_name"), ZkStateReader.toJSON(nodeProps),
+          CreateMode.EPHEMERAL, true);
+    } catch (KeeperException | InterruptedException e) {
+      LOG.error("CAPIServer could not create ephemeral node in ZooKeeper!", e);
+    }
+  }
+  
   public void startCouchbaseReplica() {
     settings = new Settings();
     this.documentTypeParentFields = settings.getByPrefix("couchbase.documentTypeParentFields.");
@@ -288,6 +311,9 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
     port = server.getPort();
     LOG.info(String.format("CAPIServer started on port %d", port));
+//    configureXDCR();
+    createZKCapiServer();
+    getCollectionsLeaders();
   }
   
   public void stopCouchbaseReplica() {
@@ -339,6 +365,37 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       map.put(params.getName(i), params.getVal(i));
     }
     return map;
+  }
+  
+  public Map <String,ZkNodeProps> getCollectionsLeaders() {
+    List<String> capiservers = new ArrayList<String>();
+    Map<String,ZkNodeProps> capiserversProps = new HashMap<String, ZkNodeProps>();
+    try {
+      zkStateReader.updateClusterState(true);
+      capiservers = zkClient.getChildren(CAPISERVER_PATH, null, true);
+      for(String serverName : capiservers) {
+        ZkNodeProps props = ZkNodeProps.load(zkClient.getData(
+            CAPISERVER_PATH + "/" + serverName, null, null, true));
+        capiserversProps.put(serverName, props);
+      }
+    } catch (KeeperException | InterruptedException e1) {
+      LOG.error("Error while updating Cluster State!", e1);
+    }
+//    ClusterState state = zkStateReader.getClusterState();
+//    Set<String> collections = state.getCollections();
+//    for(String collection : collections) {
+//      List<Slice> activeSlices = new ArrayList<Slice>(state.getActiveSlices(collection));
+//      for(Slice slice : activeSlices) {
+//        Replica replica = slice.getLeader();
+//        Map<String,Object> properties = replica.getProperties();
+//        String baseUrl = (String) properties.get("base_url");
+//        String[] splits = baseUrl.split(":");
+//        String host = splits[1].substring(splits[1].lastIndexOf("/")+1, splits[1].length());
+//        String port = splits[2].substring(0, splits[2].indexOf("/"));
+//        leaders.put(host, port);
+//      }
+//    }
+    return capiserversProps;
   }
   
   private class ElectionWatcher implements Watcher {
