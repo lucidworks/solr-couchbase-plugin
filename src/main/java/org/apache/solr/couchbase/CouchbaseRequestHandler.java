@@ -254,18 +254,26 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   
   public static int checkPort(int port) {
     ServerSocket s = null;
+    int result = -1;
     for(;;) {
       try {
         s = new ServerSocket(port);
+        result = port;
         s.close();
         break;
       } catch (IOException e) {
         //port occupied, find another one
-        port++;
+        try {
+          s = new ServerSocket(0);
+          result = s.getLocalPort();
+          s.close();
+        } catch (IOException e1) {
+          LOG.error("Could not find a free port!", e);
+        }
       }
     }
     
-    return port;
+    return result;
   }
   
   public void createZKCapiServer() {
@@ -312,8 +320,9 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     port = server.getPort();
     LOG.info(String.format("CAPIServer started on port %d", port));
 //    configureXDCR();
-    createZKCapiServer();
-    getCollectionsLeaders();
+    if(zkClient != null) {
+      createZKCapiServer();
+    }
   }
   
   public void stopCouchbaseReplica() {
