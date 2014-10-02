@@ -202,8 +202,8 @@
       <copy todir="@{solr.dir}/${solr.sharedlib.dir}">
         <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
         <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
-        <fileset dir="${lib.dir}/jetty" includes="*"/>
-        <fileset dir="${lib.dir}/runtime" includes="*"/>
+        <!--<fileset dir="${lib.dir}/jetty" includes="*"/>
+        <fileset dir="${lib.dir}/runtime" includes="*"/>-->
       </copy>
       
       <delete dir="${build.dir}/solr-war"/>
@@ -272,9 +272,11 @@
     <attribute name="original.file"/>
     <attribute name="patch.file"/>
     <sequential>
-      <exec executable="dos2unix">
+      <!--<exec executable="dos2unix">
         <arg value="@{original.file}"/>
-      </exec>
+      </exec>-->
+      <fixcrlf file="@{original.file}"
+               eol="lf" eof="remove" />
       <patch
         patchfile="@{patch.file}"
         originalfile="@{original.file}"
@@ -475,6 +477,26 @@
     <exec dir="${zk.dir}/bin" executable="./zkServer.sh">
       <arg value="stop"/>
     </exec>
+  </target>
+  
+  <target name="dist">
+    <mkdir dir="${dist.dir}"/>
+    <mkdir dir="${dist.dir}/solr-shared-libs"/>
+    <copy todir="${dist.dir}/solr-shared-libs">
+      <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+    </copy>
+    <mkdir dir="${dist.dir}/solr-war-libs"/>
+    <copy todir="${dist.dir}/solr-war-libs">
+      <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+      <fileset dir="${lib.dir}/jetty" includes="*"/>
+      <fileset dir="${lib.dir}/runtime" includes="*"/>
+    </copy>
+    <mkdir dir="${dist.dir}/docs"/>
+    <copy todir="${dist.dir}/docs">
+      <fileset dir="${basedir}">
+        <include name="README.md" />
+      </fileset>
+    </copy>
   </target>
   
 </project>
