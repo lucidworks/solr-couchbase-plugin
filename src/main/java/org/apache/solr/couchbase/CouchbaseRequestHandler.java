@@ -1,34 +1,20 @@
 package org.apache.solr.couchbase;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.NameValuePair;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
-import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -43,7 +29,6 @@ import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.response.SolrQueryResponse;
-import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.apache.zookeeper.CreateMode;
@@ -52,7 +37,6 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.noggit.ObjectBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +62,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private TypeSelector typeSelector;
   private Settings settings;
   private SolrCore core;
-  private UpdateRequestProcessor processor;
+  private UpdateRequestProcessorChain processorChain;
   private static SolrZkClient zkClient;
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
@@ -122,9 +106,8 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       }
     }) {};
     SolrQueryResponse rsp = new SolrQueryResponse();
-    UpdateRequestProcessorChain processorChain =
+    processorChain =
         core.getUpdateProcessingChain("");
-    processor = processorChain.createProcessor(req, rsp);
     zkClient = getZkClient();
     collection = core.getName();
   }
@@ -335,8 +318,8 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
   }
   
-  public UpdateRequestProcessor getProcessor() {
-    return this.processor;
+  public UpdateRequestProcessorChain getProcessorChain() {
+    return this.processorChain;
   }
   
   public SolrCore getCore() {
