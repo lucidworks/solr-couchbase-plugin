@@ -1,0 +1,46 @@
+<config>
+  <luceneMatchVersion>4.10.0</luceneMatchVersion>
+  <requestHandler name="/couchbase" class="org.apache.solr.couchbase.CouchbaseRequestHandler">
+    <lst name="params">
+      <str name="username">admin</str>
+      <str name="password">admin123</str>
+      <int name="port">9875</int>
+      <bool name="commitAfterBatch">true</bool>
+      <lst name="couchbaseServers">
+        <str name="server1">127.0.0.1:8091</str>
+        <str name="server2">127.0.0.1:9898</str>
+      </lst>
+      <str name="clusterName">solr</str>
+    </lst>
+    <lst name="bucket">
+      <str name="name">default</str>
+      <str name="splitpath">/</str>
+      <lst name="fieldmappings">
+        <str name="name">name:/name</str>
+        <str name="city">city_s:/city</str>
+        <str name="code">code_s:/code</str>
+        <str name="country">country_s:/country</str>
+        <str name="phone">phone_s:/phone</str>
+        <str name="website">url:/website</str>
+        <str name="type">type_s:/type</str>
+        <str name="updated">last_modified:/updated</str>
+        <str name="description">description:/description</str>
+        <str name="address">address_s:/address</str>
+        <str name="geo">geo_s:/geo</str>
+      </lst>
+    </lst>
+    <lst name="bucket">
+      <str name="name">test</str>
+      <str name="splitpath">/exams</str>
+      <lst name="fieldmappings">
+        <str name="first">first_s:/first</str>
+        <str name="last">last_s:/last</str>
+        <str name="grade">grade_i:/grade</str>
+        <str name="subject">subject_s:/exams/subject</str>
+        <str name="test">test_s:/exams/test</str>
+        <str name="marks">marks_i:/exams/marks</str>
+        <str name="other">/*</str>
+      </lst>
+    </lst>
+  </requestHandler>
+</config>
