@@ -272,9 +272,6 @@
     <attribute name="original.file"/>
     <attribute name="patch.file"/>
     <sequential>
-      <!--<exec executable="dos2unix">
-        <arg value="@{original.file}"/>
-      </exec>-->
       <fixcrlf file="@{original.file}"
                eol="lf" eof="remove" />
       <patch
