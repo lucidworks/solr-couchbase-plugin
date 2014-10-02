@@ -37,7 +37,7 @@ public class CouchbaseRecordHandler implements Handler{
   public void handle(Map<String, Object> record, String path) {
     SolrInputDocument solrDoc = doc.deepCopy();
     Map<String,String> mapping = SolrUtils.mapToSolrDynamicFields(record);
-    if(!path.equals("/")) {
+    if(path != null && !path.equals("/")) {
       solrDoc.setField(CommonConstants.ID_FIELD, (String)doc.getFieldValue(CommonConstants.ID_FIELD) + "-" + seq);
       seq++;
     }

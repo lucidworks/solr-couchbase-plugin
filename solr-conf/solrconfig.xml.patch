@@ -1,6 +1,6 @@
 --- solrconfig.orig.xml	2014-05-14 19:40:34.000000000 -0700
 +++ solrconfig.xml	2014-08-27 14:02:32.046369709 -0700
-@@ -1868,4 +1868,47 @@
+@@ -1868,4 +1868,44 @@
      <defaultQuery>*:*</defaultQuery>
    </admin>
  
@@ -20,17 +20,14 @@
 +      <str name="name">default</str>
 +      <str name="splitpath">/</str>
 +      <lst name="fieldmappings">
-+        <str name="name">name:/name</str>
-+        <str name="city">city_s:/city</str>
-+        <str name="code">code_s:/code</str>
-+        <str name="country">country_s:/country</str>
-+        <str name="phone">phone_s:/phone</str>
-+        <str name="website">url:/website</str>
-+        <str name="type">type_s:/type</str>
-+        <str name="updated">last_modified:/updated</str>
-+        <str name="description">description:/description</str>
-+        <str name="address">address_s:/address</str>
-+        <str name="geo">geo_s:/geo</str>
++        <str name="all">/*</str>
++      </lst>
++    </lst>
++    <lst name="bucket">
++      <str name="name">gamesim-sample</str>
++      <str name="splitpath">/</str>
++      <lst name="fieldmappings">
++        <str name="all">/*</str>
 +      </lst>
 +    </lst>
 +    <lst name="bucket">
