@@ -12,7 +12,7 @@ This plugin allows to import CouchBase data to Solr. It uses the Cross-datacente
 ```
 <solr_home>/solr/lib-couchbase/
 ```
-* Add dependencies from `solr-war-libs/' directory to solr.war and remove the older *commons-io* dependency version (2.3). Dependencies should be located in the war file under:
+* Add dependencies from `solr-war-libs/` directory to solr.war and remove the older **commons-io** dependency version (2.3). Dependencies should be located in the war file under:
 ```
 <solr-war>/WEB-INF/lib/
 ```
@@ -60,6 +60,7 @@ It is required to configure Couchbase buckets to index data from in the solrconf
     <str name="username">admin</str>
     <str name="password">admin123</str>
     <int name="port">9876</int>
+    <int name="numVBuckets">1024</int>
     <bool name="commitAfterBatch">false</bool>
     <bool name="optimize">false</bool>
   </lst>
@@ -87,8 +88,8 @@ It is required to configure Couchbase buckets to index data from in the solrconf
   - username - A valid Couchbase server username
   - password - A valid Couchbase server password
   - port - A port number on which this plugin will register itself as a Couchbase replica.
+  - numVBuckets - A number of VBuckets used by this Couchbase replica. Couchbase Server on Mac OS X uses 64 vBuckets as opposed to the 1024 vBuckets used by other platforms. **Couchbase clusters with mixed platforms are not supported.** It is required that numVBuckets is identical on the Couchbase server and Solr plugin.
   - commitAfterBatch - A flag specifying whether this plugin should commit documents to Solr after every batch of documents or when all the documents are retrieved from Couchbase.
-  - optimize - Optimize parameter for Solr's commit request.
   
 * bucket - a list with bucket parameters required to perform a synchronisation with Couchbase. Multiple lists of this type are allowed.
   - name - Bucket name - must be unique
@@ -154,9 +155,21 @@ Example field mappings for above JSON:
 
 In Couchbase admin panel, under XDCR tab following settings should be configured:
 
-* Remote Cluster - This Solr plugin should be configured as Couchbase's Remote Cluster. Click on 'Create Cluster Reference' button. Fill in cluster data. 'IP/hostname" should be <ip_address>:port and the port number is the port on which this request handler will register itself as a Couchbase Replica. It is specified in CouchbaseRequestHandler's *params* list as 'port'.
+### Remote Cluster
+
+This Solr plugin should be configured as Couchbase's Remote Cluster. Click on 'Create Cluster Reference' button and fill in cluster data.
+
+* 'Cluster Name' can be any name.
+* 'IP/hostname' should be `<ip_address>:port` and the port number is the port on which this request handler will register itself as a Couchbase Replica. It is specified in CouchbaseRequestHandler's **params** list as 'port'.
+* Username and password should be the same as those provided in solrconfig.xml file, as the replica starts with the same credentials as the Couchbase server.
  
-* Replication - Click on 'Create Replication' button. Select a Couchbase Cluster and a Bucket to replicate from. Select configured Solr's Plugin Remote Cluster and add a Bucket name. This Bucket name must match the name specified in *databases*, *fieldmappings* and *splitpaths* in the solrconfig.xml file. Under *Advaced settings* field 'XDCR Prootcol' should be set to 'Version 1' value.
+### Replication
+
+Click on 'Create Replication' button.
+
+* Select a Couchbase Cluster and a Bucket to replicate from.
+* Select configured Solr's Plugin Remote Cluster and add a Bucket name. This Bucket name must match the name specified in the bucket **name** parameter in the solrconfig.xml file.
+* Under *Advaced settings* **XDCR Prootcol** should be set to 'Version 1' value.
 
 
 # Multiple collections
@@ -177,3 +190,5 @@ To stop the plugin, exegute GET request to the URL
 ```
 http://<solr_address>/solr/collection1/couchbase?action=stop
 ```
+
+In a case, when all configured Solr instances with this plugin are restarted, Couchbase XDCR must be configured again. This is because every time a Couchbase replica is started, it acquires new pool UUID which is used in communications with Couchbase server.
