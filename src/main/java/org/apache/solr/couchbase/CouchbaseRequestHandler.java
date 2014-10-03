@@ -1,34 +1,21 @@
 package org.apache.solr.couchbase;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.NameValuePair;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
-import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -43,7 +30,6 @@ import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.response.SolrQueryResponse;
-import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.apache.zookeeper.CreateMode;
@@ -52,7 +38,6 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.noggit.ObjectBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,10 +60,11 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private int port = -1;
   private String username;
   private String password;
+  private int numVBuckets;
   private TypeSelector typeSelector;
   private Settings settings;
   private SolrCore core;
-  private UpdateRequestProcessor processor;
+  private UpdateRequestProcessorChain processorChain;
   private static SolrZkClient zkClient;
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
@@ -90,6 +76,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private ObjectMapper mapper = new ObjectMapper();
   private ArrayList<String> clusterNames;
   private String collection;
+  private boolean isRunning = false;
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
@@ -101,7 +88,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   @Override
   public void inform(SolrCore core) {
     this.core = core;
-    SolrQueryRequest req = new SolrQueryRequestBase(core, new SolrParams() {
+    SolrQueryRequest req = new SolrQueryRequestBase(getCore(), new SolrParams() {
       
       @Override
       public String[] getParams(String param) {
@@ -122,11 +109,10 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       }
     }) {};
     SolrQueryResponse rsp = new SolrQueryResponse();
-    UpdateRequestProcessorChain processorChain =
-        core.getUpdateProcessingChain("");
-    processor = processorChain.createProcessor(req, rsp);
+    processorChain =
+        getCore().getUpdateProcessingChain("");
     zkClient = getZkClient();
-    collection = core.getName();
+    collection = getCore().getName();
   }
   
   @Override
@@ -135,6 +121,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     Map<String,Object> params = toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
     username = params.get(CommonConstants.USERNAME_FIELD).toString();
     password = params.get(CommonConstants.PASSWORD_FIELD).toString();
+    numVBuckets = (int) params.get(CommonConstants.NUM_VBUCKETS_FIELD);
     port = (int)params.get(CommonConstants.PORT_FIELD);
     commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
     couchbaseServersList = new ArrayList<String>(SolrParams.toMap((NamedList)params.get(CommonConstants.COUCHBASE_SERVERS_MARK)).values());
@@ -189,8 +176,8 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   
   public SolrZkClient getZkClient() {
     SolrZkClient client = null;
-    if(core != null) {
-      CoreContainer container = core.getCoreDescriptor().getCoreContainer();
+    if(getCore() != null) {
+      CoreContainer container = getCore().getCoreDescriptor().getCoreContainer();
       if(container.isZooKeeperAware()) {
         client = container.getZkController().getZkClient();
       }
@@ -198,20 +185,28 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     return client;
   }
   public boolean isSolrCloud() {
-    return core.getCoreDescriptor().getCoreContainer().isZooKeeperAware();
+    return getCore().getCoreDescriptor().getCoreContainer().isZooKeeperAware();
   }
   
   public void handleStart() {
-    //Check if in SolrCloud mode
-    if(isSolrCloud()) {
-      checkIfIamLeader();
+    if(!isRunning) {
+      //Check if in SolrCloud mode
+      if(isSolrCloud()) {
+        checkIfIamLeader();
+      } else {
+        startCouchbaseReplica();
+      }
     } else {
-      startCouchbaseReplica();
+      LOG.info("CAPIServer already running.");
     }
   }
   
   public void handleStop() {
-    stopCouchbaseReplica();
+    if(isRunning) {
+      stopCouchbaseReplica();
+    } else {
+      LOG.info("CAPIServer is not running.");
+    }
   }
   
   public void checkIfIamLeader() {
@@ -222,7 +217,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     } catch (KeeperException | InterruptedException e1) {
       LOG.error("Error while updating Cluster State!", e1);
     }
-    String collection = core.getName();
+    String collection = getCore().getName();
     Map<String,Slice> slices = zkStateReader.getClusterState().getActiveSlicesMap(collection);
     List<String> sliceNames = new ArrayList<String>(slices.keySet());
     Collections.sort(sliceNames);
@@ -233,7 +228,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     } catch (InterruptedException e) {
       LOG.error("Could not get leader!", e);
     }
-    final String coreNodeName = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
+    final String coreNodeName = getCore().getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
     if(replica != null && coreNodeName != null && replica.getName().equals(coreNodeName)) { // I am the leader
       startCouchbaseReplica();
     } else { // I'm not the leader, watch leader.
@@ -310,18 +305,18 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     couchbaseBehaviour = new SolrCouchbaseBehaviour(this);
     port = checkPort(port);
     capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
-    server = new CAPIServer(capiBehaviour, couchbaseBehaviour, port, username, password);
-    //TODO fix this
+    server = new CAPIServer(capiBehaviour, couchbaseBehaviour, new InetSocketAddress("0.0.0.0", port), username, password, numVBuckets);
     try{
       server.start();
+      port = server.getPort();
+      LOG.info(String.format("CAPIServer started on port %d", port));
+//      configureXDCR();
+      if(zkClient != null) {
+        createZKCapiServer();
+      }
+      isRunning = true;
     } catch (Exception e) {
       LOG.error("Could not start CAPIServer!", e);
-    }
-    port = server.getPort();
-    LOG.info(String.format("CAPIServer started on port %d", port));
-//    configureXDCR();
-    if(zkClient != null) {
-      createZKCapiServer();
     }
   }
   
@@ -329,14 +324,15 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     if(server != null) {
       try {
         server.stop();
+        isRunning = false;
       } catch (Exception e) {
         LOG.error("Error while stopping Couchbase server.", e);
       }
     }
   }
   
-  public UpdateRequestProcessor getProcessor() {
-    return this.processor;
+  public UpdateRequestProcessorChain getProcessorChain() {
+    return this.processorChain;
   }
   
   public SolrCore getCore() {

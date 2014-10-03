@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
 import org.apache.solr.common.SolrInputDocument;
@@ -19,14 +18,17 @@ import org.apache.solr.common.util.JsonRecordReader;
 import org.apache.solr.common.util.JsonRecordReader.Handler;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
+import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.DocIterator;
 import org.apache.solr.search.DocSet;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.CommitUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
+import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.noggit.JSONParser;
+import org.noggit.JSONUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,6 +157,11 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
             }
         }
     }
+    try {
+      searcher.close();
+    } catch (IOException e) {
+      LOG.error("Could not close searcher!", e);
+    }
     long end = System.currentTimeMillis();
     meanRevsDiffRequests.inc(end - start);
     activeRevsDiffRequests.dec();
@@ -197,6 +204,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
 
           // these are the top-level elements that could be in the document sent by Couchbase
           Map<String, Object> meta = (Map<String, Object>)doc.get("meta");
+          String metaJson = JSONUtil.toJSON(meta);
           Map<String, Object> jsonMap = (Map<String, Object>)doc.get("json");
           String base64 = (String)doc.get("base64");
           String jsonString = null;
@@ -233,7 +241,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
           solrDoc.addField(CommonConstants.ID_FIELD, id);
           solrDoc.addField(CommonConstants.REVISION_FIELD, rev);
           solrDoc.addField(CommonConstants.JSON_FIELD, jsonString);
-          solrDoc.addField(CommonConstants.METADATA_FIELD, meta);
+          solrDoc.addField(CommonConstants.METADATA_FIELD, metaJson);
           
           Map<String, Object> toBeIndexed = new HashMap<String, Object>();
           toBeIndexed.put("meta", meta);
@@ -262,7 +270,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
             }
             
             if(parentField != null) {
-                Object parent = JSONMapPath(toBeIndexed, parentField);
+                Object parent = jsonMapPath(toBeIndexed, parentField);
                 if (parent != null && parent instanceof String ) {
                   solrDoc.addField(CommonConstants.PARENT_FIELD, parent);
                 } else {
@@ -270,7 +278,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
                 }
             }
             if(routingField != null) {
-                Object routing = JSONMapPath(toBeIndexed, routingField);
+                Object routing = jsonMapPath(toBeIndexed, routingField);
                 if (routing != null && routing instanceof String) {
                   solrDoc.addField(CommonConstants.ROUTING_FIELD, routing);
                 } else {
@@ -439,7 +447,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
       return null;
   }
   
-  public Object JSONMapPath(Map<String, Object> json, String path) {
+  public Object jsonMapPath(Map<String, Object> json, String path) {
     int dotIndex = path.indexOf('.');
     if (dotIndex >= 0) {
         String pathThisLevel = path.substring(0,dotIndex);
@@ -449,7 +457,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
             return current;
         }
         else if(current instanceof Map && pathRest.length() > 0) {
-            return JSONMapPath((Map<String, Object>)current, pathRest);
+            return jsonMapPath((Map<String, Object>)current, pathRest);
         }
     } else {
         // no dot
@@ -464,7 +472,9 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     try {
       AddUpdateCommand command = new AddUpdateCommand(req);
       command.solrDoc = doc;
-      handler.getProcessor().processAdd(command);
+      SolrQueryResponse rsp = new SolrQueryResponse();
+      UpdateRequestProcessor processor = handler.getProcessorChain().createProcessor(req, rsp);
+      processor.processAdd(command);
       success = true;
     } catch (Exception e) {
       LOG.warn("Error creating document : " + doc, e);
@@ -478,7 +488,9 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
       LOG.info("Deleting document:" + id);
       DeleteUpdateCommand delCmd = new DeleteUpdateCommand(req);
       delCmd.setId(id.toString());
-      handler.getProcessor().processDelete(delCmd);
+      SolrQueryResponse rsp = new SolrQueryResponse();
+      UpdateRequestProcessor processor = handler.getProcessorChain().createProcessor(req, rsp);
+      processor.processDelete(delCmd);
       success = true;
     } catch (IOException e) {
       LOG.error("Exception while deleting doc:" + id, e);
@@ -489,7 +501,9 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   public void commit(SolrQueryRequest req) {
     try {
       CommitUpdateCommand commit = new CommitUpdateCommand(req,false);
-      handler.getProcessor().processCommit(commit);
+      SolrQueryResponse rsp = new SolrQueryResponse();
+      UpdateRequestProcessor processor = handler.getProcessorChain().createProcessor(req, rsp);
+      processor.processCommit(commit);
     } catch (Exception e) {
       LOG.error("Exception while solr commit.", e);
     }

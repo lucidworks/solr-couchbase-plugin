@@ -1,5 +1,7 @@
 <project name="solr-couchbase-plugin"
+         default="dist"
          xmlns:ivy="antlib:org.apache.ivy.ant">
+  
   <description>Solr Couchbase plugin</description>
 
   <property file="build.properties"/>
@@ -197,15 +199,6 @@
       <ivy:resolve conf="solr.logging" log="download-only"/>
       <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
 
-      <mkdir dir="${solr.extra.libs}"/>
-      <mkdir dir="@{solr.dir}/${solr.sharedlib.dir}"/>
-      <copy todir="@{solr.dir}/${solr.sharedlib.dir}">
-        <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
-        <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
-        <fileset dir="${lib.dir}/jetty" includes="*"/>
-        <fileset dir="${lib.dir}/runtime" includes="*"/>
-      </copy>
-      
       <delete dir="${build.dir}/solr-war"/>
       <mkdir dir="${build.dir}/solr-war"/>
       <unwar src="@{solr.dir}/webapps/solr.war" dest="${build.dir}/solr-war">
@@ -214,24 +207,20 @@
         </patternset>
       </unwar>
       
-      <!--<delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>-->
+      <!--<delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io*.jar"/>-->
       <copy todir="${build.dir}/solr-war/WEB-INF/lib">
         <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
         <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
+        <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
       </copy>
       <war destfile="${build.dir}/solr-war/solr.war" webxml="${build.dir}/solr-war/WEB-INF/web.xml">
         <fileset dir="${build.dir}/solr-war">
           <include name="**/*" />
         </fileset>
       </war>
-      <move tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
+      <copy tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
         <fileset file="${build.dir}/solr-war/solr.war"/>
-      </move>
-      
-      <!--<jar destfile="@{solr.dir}/webapps/solr.war" update="true" >
-        <zipfileset dir="${solr.extra.libs}" includes="*.jar" prefix="WEB-INF/lib" />
-      </jar>-->
-
+      </copy>
     </sequential>
   </macrodef>
   
@@ -265,16 +254,16 @@
   <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty, ivy-resolve-solr-jetty">
     <prep-solr solr.dir="${solr.cloud.dir.1}" solr.version="${solr.server.version}"/>
     <prep-solr solr.dir="${solr.cloud.dir.2}" solr.version="${solr.server.version}"/>
-    <prep-solr solr.dir="${solr.cloud.dir.3}" solr.version="${solr.server.version}"/>
+    <!--3rd node for failover testing-->
+    <!--<prep-solr solr.dir="${solr.cloud.dir.3}" solr.version="${solr.server.version}"/>-->
   </target>
   
   <macrodef name="patch-solr">
     <attribute name="original.file"/>
     <attribute name="patch.file"/>
     <sequential>
-      <exec executable="dos2unix">
-        <arg value="@{original.file}"/>
-      </exec>
+      <fixcrlf file="@{original.file}"
+               eol="lf" eof="remove" />
       <patch
         patchfile="@{patch.file}"
         originalfile="@{original.file}"
@@ -475,6 +464,43 @@
     <exec dir="${zk.dir}/bin" executable="./zkServer.sh">
       <arg value="stop"/>
     </exec>
+  </target>
+  
+  <target name="dist" depends="prep-solr, patch-solr" description="Create Solr Couchbase plugin package">
+    <mkdir dir="${dist.dir}"/>
+    <mkdir dir="${dist.dir}/solr-shared-libs"/>
+    <copy todir="${dist.dir}/solr-shared-libs">
+      <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+    </copy>
+    <mkdir dir="${dist.dir}/solr-war-libs"/>
+    <copy todir="${dist.dir}/solr-war-libs">
+      <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+      <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
+      <fileset dir="${lib.dir}/runtime" includes="*"/>
+    </copy>
+    <mkdir dir="${dist.dir}/docs"/>
+    <copy todir="${dist.dir}/docs">
+      <fileset dir="${basedir}/docs">
+        <include name="installation.txt" />
+      </fileset>
+    </copy>
+    <mkdir dir="${dist.dir}/example"/>
+    <copy todir="${dist.dir}/example">
+      <fileset dir="${solr.dir}/solr">
+        <include name="solr.xml" />
+      </fileset>
+      <fileset dir="${solr.dir}/solr/collection1/conf">
+        <include name="solrconfig.xml" />
+      </fileset>
+    </copy>
+    
+    <tar longfile="gnu"
+         destfile="${dist.dir}/${ant.project.name}-${solr.couchbase.plugin.version}.tar.gz"
+         compression="gzip">
+      <tarfileset dir="${dist.dir}" filemode="644" username="ant" group="ant" prefix="${ant.project.name}">
+        <include name="**/*" />
+      </tarfileset>
+    </tar>
   </target>
   
 </project>

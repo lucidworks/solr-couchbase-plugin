@@ -11,6 +11,7 @@ public class CommonConstants {
   public static final String SPLITPATH_FIELD = "splitpath";
   public static final String USERNAME_FIELD = "username";
   public static final String PASSWORD_FIELD = "password";
+  public static final String NUM_VBUCKETS_FIELD = "numVBuckets";
   public static final String PORT_FIELD = "port";
   public static final String NAME_FIELD = "name";
   public static final String COMMIT_AFTER_BATCH_FIELD = "commitAfterBatch";
