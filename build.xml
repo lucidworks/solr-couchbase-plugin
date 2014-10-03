@@ -478,7 +478,7 @@
     </exec>
   </target>
   
-  <target name="dist">
+  <target name="dist" depends="prep-solr, patch-solr" description="Create Solr Couchbase plugin package">
     <mkdir dir="${dist.dir}"/>
     <mkdir dir="${dist.dir}/solr-shared-libs"/>
     <copy todir="${dist.dir}/solr-shared-libs">
@@ -492,8 +492,17 @@
     </copy>
     <mkdir dir="${dist.dir}/docs"/>
     <copy todir="${dist.dir}/docs">
-      <fileset dir="${basedir}">
-        <include name="README.md" />
+      <fileset dir="${basedir}/docs">
+        <include name="installation.txt" />
+      </fileset>
+    </copy>
+    <mkdir dir="${dist.dir}/example"/>
+    <copy todir="${dist.dir}/example">
+      <fileset dir="${solr.dir}/solr">
+        <include name="solr.xml" />
+      </fileset>
+      <fileset dir="${solr.dir}/solr/collection1/conf">
+        <include name="solrconfig.xml" />
       </fileset>
     </copy>
     
