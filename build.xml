@@ -1,5 +1,7 @@
 <project name="solr-couchbase-plugin"
+         default="dist"
          xmlns:ivy="antlib:org.apache.ivy.ant">
+  
   <description>Solr Couchbase plugin</description>
 
   <property file="build.properties"/>
