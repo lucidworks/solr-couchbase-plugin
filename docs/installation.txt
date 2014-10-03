@@ -8,11 +8,7 @@ This plugin allows to import CouchBase data to Solr. It uses the Cross-datacente
 
 ## Dependencies
 
-* Copy this plugin from `solr-shared-libs/` to the directory:
-```
-<solr_home>/solr/lib-couchbase/
-```
-* Add dependencies from `solr-war-libs/` directory to solr.war and remove the older **commons-io** dependency version (2.3). Dependencies should be located in the war file under:
+* Copy this plugin and its dependencies from `lib/` directory to solr.war and remove the older **commons-io** dependency version (2.3). All libraries should be copied to the war file under:
 ```
 <solr-war>/WEB-INF/lib/
 ```
@@ -20,39 +16,9 @@ This plugin allows to import CouchBase data to Solr. It uses the Cross-datacente
 solr.war file can be updated by performing this steps:
 1. extract original solr.war file
 2. in the `<solr-war>/WEB-INF/lib/` directory put this plugin library and its dependencies
-3. make new war file by executing this command in the extracted solr.war directory `jar -cvf solr.war .`
-4. copy new solr.war file to the `<solr_home>/webapps/` directory.
-
-## solr.xml
-
-An additional line to solr.xml should be added, to inform Solr about new dependencies which should be included in the Solr's classpath. Add the following line to solr.xml file:
-
-```
-<str name="sharedLib">${sharedLib:lib-couchbase}</str>
-```
-
-The whole solr.xml file should look as follows:
-
-```
-<solr>
-  <str name="sharedLib">${sharedLib:lib-couchbase}</str>
-
-  <solrcloud>
-    <str name="host">${host:}</str>
-    <int name="hostPort">${jetty.port:8983}</int>
-    <str name="hostContext">${hostContext:solr}</str>
-    <int name="zkClientTimeout">${zkClientTimeout:30000}</int>
-    <bool name="genericCoreNodeNames">${genericCoreNodeNames:true}</bool>
-  </solrcloud>
-
-  <shardHandlerFactory name="shardHandlerFactory"
-    class="HttpShardHandlerFactory">
-    <int name="socketTimeout">${socketTimeout:0}</int>
-    <int name="connTimeout">${connTimeout:0}</int>
-  </shardHandlerFactory>
-
-</solr>
-```
+3. remove older commons-io dependency (optional)
+4. make new war file by executing this command in the extracted solr.war directory `jar -cvf solr.war .`
+5. copy new solr.war file to the `<solr_home>/webapps/` directory.
 
 
 ## solrconfig.xml

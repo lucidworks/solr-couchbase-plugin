@@ -468,13 +468,11 @@
   
   <target name="dist" depends="prep-solr, patch-solr" description="Create Solr Couchbase plugin package">
     <mkdir dir="${dist.dir}"/>
-    <mkdir dir="${dist.dir}/solr-shared-libs"/>
-    <copy todir="${dist.dir}/solr-shared-libs">
+    <copy todir="${dist.dir}">
       <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
     </copy>
-    <mkdir dir="${dist.dir}/solr-war-libs"/>
-    <copy todir="${dist.dir}/solr-war-libs">
-      <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+    <mkdir dir="${dist.dir}/lib"/>
+    <copy todir="${dist.dir}/lib">
       <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
       <fileset dir="${lib.dir}/runtime" includes="*"/>
     </copy>
@@ -495,7 +493,7 @@
     </copy>
     
     <tar longfile="gnu"
-         destfile="${dist.dir}/${ant.project.name}-${solr.couchbase.plugin.version}.tar.gz"
+         destfile="${dist.dir}/${ant.project.name}-dist-${solr.couchbase.plugin.version}.tar.gz"
          compression="gzip">
       <tarfileset dir="${dist.dir}" filemode="644" username="ant" group="ant" prefix="${ant.project.name}">
         <include name="**/*" />
