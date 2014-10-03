@@ -28,6 +28,7 @@ import org.apache.solr.update.DeleteUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.noggit.JSONParser;
+import org.noggit.JSONUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -203,6 +204,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
 
           // these are the top-level elements that could be in the document sent by Couchbase
           Map<String, Object> meta = (Map<String, Object>)doc.get("meta");
+          String metaJson = JSONUtil.toJSON(meta);
           Map<String, Object> jsonMap = (Map<String, Object>)doc.get("json");
           String base64 = (String)doc.get("base64");
           String jsonString = null;
@@ -239,7 +241,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
           solrDoc.addField(CommonConstants.ID_FIELD, id);
           solrDoc.addField(CommonConstants.REVISION_FIELD, rev);
           solrDoc.addField(CommonConstants.JSON_FIELD, jsonString);
-          solrDoc.addField(CommonConstants.METADATA_FIELD, meta);
+          solrDoc.addField(CommonConstants.METADATA_FIELD, metaJson);
           
           Map<String, Object> toBeIndexed = new HashMap<String, Object>();
           toBeIndexed.put("meta", meta);
