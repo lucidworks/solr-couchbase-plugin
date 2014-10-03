@@ -490,7 +490,7 @@
     <mkdir dir="${dist.dir}/solr-war-libs"/>
     <copy todir="${dist.dir}/solr-war-libs">
       <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
-      <fileset dir="${lib.dir}/jetty" includes="*"/>
+      <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
       <fileset dir="${lib.dir}/runtime" includes="*"/>
     </copy>
     <mkdir dir="${dist.dir}/docs"/>

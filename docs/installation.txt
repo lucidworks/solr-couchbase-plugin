@@ -17,6 +17,11 @@ This plugin allows to import CouchBase data to Solr. It uses the Cross-datacente
 <solr-war>/WEB-INF/lib/
 ```
 
+solr.war file can be updated by performing this steps:
+1. extract original solr.war file
+2. in the `<solr-war>/WEB-INF/lib/` directory put this plugin library and its dependencies
+3. make new war file by executing this command in the extracted solr.war directory `jar -cvf solr.war .`
+4. copy new solr.war file to the `<solr_home>/webapps/` directory.
 
 ## solr.xml
 
