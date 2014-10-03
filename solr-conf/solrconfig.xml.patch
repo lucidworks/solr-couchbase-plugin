@@ -1,6 +1,6 @@
 --- solrconfig.orig.xml	2014-05-14 19:40:34.000000000 -0700
 +++ solrconfig.xml	2014-08-27 14:02:32.046369709 -0700
-@@ -1868,4 +1868,44 @@
+@@ -1868,4 +1868,45 @@
      <defaultQuery>*:*</defaultQuery>
    </admin>
  
@@ -8,7 +8,8 @@
 +    <lst name="params">
 +      <str name="username">admin</str>
 +      <str name="password">admin123</str>
-+      <int name="port">9875</int>
++      <int name="port">9876</int>
++      <int name="numVBuckets">1024</int>
 +      <bool name="commitAfterBatch">true</bool>
 +      <lst name="couchbaseServers">
 +        <str name="server1">127.0.0.1:8091</str>

@@ -250,7 +250,7 @@
     <java dir="${solr.dir}" jar="${solr.dir}/jetty-start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
-      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
       <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
@@ -269,7 +269,8 @@
   <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty, ivy-resolve-solr-jetty">
     <prep-solr solr.dir="${solr.cloud.dir.1}" solr.version="${solr.server.version}"/>
     <prep-solr solr.dir="${solr.cloud.dir.2}" solr.version="${solr.server.version}"/>
-    <prep-solr solr.dir="${solr.cloud.dir.3}" solr.version="${solr.server.version}"/>
+    <!--3rd node for failover testing-->
+    <!--<prep-solr solr.dir="${solr.cloud.dir.3}" solr.version="${solr.server.version}"/>-->
   </target>
   
   <macrodef name="patch-solr">

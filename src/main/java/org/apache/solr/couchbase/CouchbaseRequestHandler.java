@@ -1,5 +1,6 @@
 package org.apache.solr.couchbase;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,6 +60,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private int port = -1;
   private String username;
   private String password;
+  private int numVBuckets;
   private TypeSelector typeSelector;
   private Settings settings;
   private SolrCore core;
@@ -74,6 +76,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private ObjectMapper mapper = new ObjectMapper();
   private ArrayList<String> clusterNames;
   private String collection;
+  private boolean isRunning = false;
 
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
@@ -118,6 +121,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     Map<String,Object> params = toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
     username = params.get(CommonConstants.USERNAME_FIELD).toString();
     password = params.get(CommonConstants.PASSWORD_FIELD).toString();
+    numVBuckets = (int) params.get(CommonConstants.NUM_VBUCKETS_FIELD);
     port = (int)params.get(CommonConstants.PORT_FIELD);
     commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
     couchbaseServersList = new ArrayList<String>(SolrParams.toMap((NamedList)params.get(CommonConstants.COUCHBASE_SERVERS_MARK)).values());
@@ -144,6 +148,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
           new UsernamePasswordCredentials(username, password));
     }
     httpClient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
+    handleStart();
   }
   
   @Override
@@ -185,16 +190,24 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   }
   
   public void handleStart() {
-    //Check if in SolrCloud mode
-    if(isSolrCloud()) {
-      checkIfIamLeader();
+    if(!isRunning) {
+      //Check if in SolrCloud mode
+      if(isSolrCloud()) {
+        checkIfIamLeader();
+      } else {
+        startCouchbaseReplica();
+      }
     } else {
-      startCouchbaseReplica();
+      LOG.info("CAPIServer already running.");
     }
   }
   
   public void handleStop() {
-    stopCouchbaseReplica();
+    if(isRunning) {
+      stopCouchbaseReplica();
+    } else {
+      LOG.info("CAPIServer is not running.");
+    }
   }
   
   public void checkIfIamLeader() {
@@ -293,18 +306,18 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     couchbaseBehaviour = new SolrCouchbaseBehaviour(this);
     port = checkPort(port);
     capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
-    server = new CAPIServer(capiBehaviour, couchbaseBehaviour, port, username, password);
-    //TODO fix this
+    server = new CAPIServer(capiBehaviour, couchbaseBehaviour, new InetSocketAddress("0.0.0.0", port), username, password, numVBuckets);
     try{
       server.start();
+      port = server.getPort();
+      LOG.info(String.format("CAPIServer started on port %d", port));
+//      configureXDCR();
+      if(zkClient != null) {
+        createZKCapiServer();
+      }
+      isRunning = true;
     } catch (Exception e) {
       LOG.error("Could not start CAPIServer!", e);
-    }
-    port = server.getPort();
-    LOG.info(String.format("CAPIServer started on port %d", port));
-//    configureXDCR();
-    if(zkClient != null) {
-      createZKCapiServer();
     }
   }
   
@@ -312,6 +325,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     if(server != null) {
       try {
         server.stop();
+        isRunning = false;
       } catch (Exception e) {
         LOG.error("Error while stopping Couchbase server.", e);
       }
