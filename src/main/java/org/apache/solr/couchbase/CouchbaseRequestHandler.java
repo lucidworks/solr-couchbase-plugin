@@ -148,7 +148,6 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
           new UsernamePasswordCredentials(username, password));
     }
     httpClient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
-    handleStart();
   }
   
   @Override
