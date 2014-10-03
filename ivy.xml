@@ -38,13 +38,13 @@
     <dependency org="org.eclipse.jetty" name="jetty-io" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-jmx" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-security" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" transitive="false" conf="solr.jetty->default;runtime->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-server" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
-    <dependency org="org.eclipse.jetty" name="jetty-util" rev="${jetty.version}" transitive="false" conf="solr.jetty->default;runtime->default"/>
+    <dependency org="org.eclipse.jetty" name="jetty-util" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-xml" rev="${jetty.version}" transitive="false" conf="solr.jetty->default"/>
     <dependency org="org.eclipse.jetty" name="jetty-start" rev="${jetty.version}" transitive="false" conf="solr.start->default"/>
-    <dependency org="org.eclipse.jetty.orbit" name="javax.servlet" rev="${servlet.version}" transitive="false" conf="jetty->default;solr.jetty->default">
+    <dependency org="org.eclipse.jetty.orbit" name="javax.servlet" rev="${servlet.version}" transitive="false" conf="jetty->default;solr.jetty->default;runtime->default">
       <artifact name="javax.servlet" type="orbit" ext="jar"/>
     </dependency>
     <dependency org="org.mortbay.jetty" name="jetty-runner" rev="${jetty.version}" conf="solr.jetty->master"/>
@@ -59,13 +59,12 @@
     <!-- commons-codec -->
     <dependency org="commons-codec" name="commons-codec" rev="1.6" conf="compile->default"/>
     <!-- jackson-mapper-asl -->
-    <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="compile->default"/>
+    <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.13" conf="compile->default;runtime->default"/>
     <!-- noggit -->
     <dependency org="org.noggit" name="noggit" rev="0.6" conf="compile->default"/>
     <!-- jUnit -->
     <dependency org="junit" name="junit" rev="4.11" conf="compile->default"/>
     <!-- other -->
-    <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.8" conf="runtime->default"/>
     <dependency org="commons-io" name="commons-io" rev="2.4" conf="compile->default;runtime->default"/>
     <dependency org="org.apache.lucene" name="lucene-test-framework" rev="${solr.server.version}" conf="test->master"/>
     <dependency org="com.carrotsearch.randomizedtesting" name="randomizedtesting-runner" rev="2.1.6" conf="compile->default"/>

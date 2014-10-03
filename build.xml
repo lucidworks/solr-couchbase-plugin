@@ -214,7 +214,7 @@
         </patternset>
       </unwar>
       
-      <!--<delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io-2.1.jar"/>-->
+      <!--<delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io*.jar"/>-->
       <copy todir="${build.dir}/solr-war/WEB-INF/lib">
         <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
         <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
@@ -224,14 +224,16 @@
           <include name="**/*" />
         </fileset>
       </war>
-      <move tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
+      <copy tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
         <fileset file="${build.dir}/solr-war/solr.war"/>
-      </move>
+      </copy>
       
-      <!--<jar destfile="@{solr.dir}/webapps/solr.war" update="true" >
-        <zipfileset dir="${solr.extra.libs}" includes="*.jar" prefix="WEB-INF/lib" />
-      </jar>-->
-
+      <!--
+      <mkdir dir="@{solr.dir}/lib"/>
+      <copy todir="@{solr.dir}/lib">
+        <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
+      </copy>
+      -->
     </sequential>
   </macrodef>
   
@@ -246,7 +248,7 @@
     <java dir="${solr.dir}" jar="${solr.dir}/jetty-start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
-      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
       <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
@@ -494,6 +496,14 @@
         <include name="README.md" />
       </fileset>
     </copy>
+    
+    <tar longfile="gnu"
+         destfile="${dist.dir}/${ant.project.name}-${solr.couchbase.plugin.version}.tar.gz"
+         compression="gzip">
+      <tarfileset dir="${dist.dir}" filemode="644" username="ant" group="ant" prefix="${ant.project.name}">
+        <include name="**/*" />
+      </tarfileset>
+    </tar>
   </target>
   
 </project>
