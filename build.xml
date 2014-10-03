@@ -199,15 +199,6 @@
       <ivy:resolve conf="solr.logging" log="download-only"/>
       <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
 
-      <mkdir dir="${solr.extra.libs}"/>
-      <mkdir dir="@{solr.dir}/${solr.sharedlib.dir}"/>
-      <copy todir="@{solr.dir}/${solr.sharedlib.dir}">
-        <!--<fileset dir="${build-lib.dir}" includes="couchbase-capi-server-${couchbase-capi-server.version}.jar"/>-->
-        <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
-        <!--<fileset dir="${lib.dir}/jetty" includes="*"/>
-        <fileset dir="${lib.dir}/runtime" includes="*"/>-->
-      </copy>
-      
       <delete dir="${build.dir}/solr-war"/>
       <mkdir dir="${build.dir}/solr-war"/>
       <unwar src="@{solr.dir}/webapps/solr.war" dest="${build.dir}/solr-war">
@@ -220,6 +211,7 @@
       <copy todir="${build.dir}/solr-war/WEB-INF/lib">
         <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
         <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
+        <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
       </copy>
       <war destfile="${build.dir}/solr-war/solr.war" webxml="${build.dir}/solr-war/WEB-INF/web.xml">
         <fileset dir="${build.dir}/solr-war">
@@ -229,13 +221,6 @@
       <copy tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
         <fileset file="${build.dir}/solr-war/solr.war"/>
       </copy>
-      
-      <!--
-      <mkdir dir="@{solr.dir}/lib"/>
-      <copy todir="@{solr.dir}/lib">
-        <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
-      </copy>
-      -->
     </sequential>
   </macrodef>
   
