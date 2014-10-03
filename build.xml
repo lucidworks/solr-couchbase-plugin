@@ -235,7 +235,7 @@
     <java dir="${solr.dir}" jar="${solr.dir}/jetty-start.jar" fork="true" failonerror="true">
       <jvmarg line="-Djava.awt.headless=true"/>
       <jvmarg line="-Xmx${heap.size}"/>
-      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=y"/>
+      <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
       <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
       <sysproperty key="STOP.KEY" value="srsly.stop"/>
