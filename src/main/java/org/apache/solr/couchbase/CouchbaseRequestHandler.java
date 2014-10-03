@@ -88,7 +88,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   @Override
   public void inform(SolrCore core) {
     this.core = core;
-    SolrQueryRequest req = new SolrQueryRequestBase(core, new SolrParams() {
+    SolrQueryRequest req = new SolrQueryRequestBase(getCore(), new SolrParams() {
       
       @Override
       public String[] getParams(String param) {
@@ -110,9 +110,9 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }) {};
     SolrQueryResponse rsp = new SolrQueryResponse();
     processorChain =
-        core.getUpdateProcessingChain("");
+        getCore().getUpdateProcessingChain("");
     zkClient = getZkClient();
-    collection = core.getName();
+    collection = getCore().getName();
   }
   
   @Override
@@ -176,8 +176,8 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   
   public SolrZkClient getZkClient() {
     SolrZkClient client = null;
-    if(core != null) {
-      CoreContainer container = core.getCoreDescriptor().getCoreContainer();
+    if(getCore() != null) {
+      CoreContainer container = getCore().getCoreDescriptor().getCoreContainer();
       if(container.isZooKeeperAware()) {
         client = container.getZkController().getZkClient();
       }
@@ -185,7 +185,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     return client;
   }
   public boolean isSolrCloud() {
-    return core.getCoreDescriptor().getCoreContainer().isZooKeeperAware();
+    return getCore().getCoreDescriptor().getCoreContainer().isZooKeeperAware();
   }
   
   public void handleStart() {
@@ -217,7 +217,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     } catch (KeeperException | InterruptedException e1) {
       LOG.error("Error while updating Cluster State!", e1);
     }
-    String collection = core.getName();
+    String collection = getCore().getName();
     Map<String,Slice> slices = zkStateReader.getClusterState().getActiveSlicesMap(collection);
     List<String> sliceNames = new ArrayList<String>(slices.keySet());
     Collections.sort(sliceNames);
@@ -228,7 +228,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     } catch (InterruptedException e) {
       LOG.error("Could not get leader!", e);
     }
-    final String coreNodeName = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
+    final String coreNodeName = getCore().getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
     if(replica != null && coreNodeName != null && replica.getName().equals(coreNodeName)) { // I am the leader
       startCouchbaseReplica();
     } else { // I'm not the leader, watch leader.
