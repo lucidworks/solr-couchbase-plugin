@@ -165,7 +165,7 @@ To sunchronize documents from Couchbase to multiple Solr collections, each colle
 
 # Running Solr Couchbase Plugin
 
-To run this plugin, simply perform all actions described in Configuration section of this instruction, and run Solr. To run single instance of Solr, execute `ant run-solr` command in the main directory. To run Solr in Cloud mode, execute `ant solr-cloud` command in the main directory. When solr is started execute GET request to URL
+To run this plugin, simply perform all actions described in Configuration section of this instruction, and run Solr. When solr is started execute GET request to URL
 
 ```
 http://<solr_address>/solr/collection1/couchbase?action=start
