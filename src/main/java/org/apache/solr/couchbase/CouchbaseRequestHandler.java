@@ -124,9 +124,21 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     numVBuckets = (int) params.get(CommonConstants.NUM_VBUCKETS_FIELD);
     port = (int)params.get(CommonConstants.PORT_FIELD);
     commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
-    couchbaseServersList = new ArrayList<String>(SolrParams.toMap((NamedList)params.get(CommonConstants.COUCHBASE_SERVERS_MARK)).values());
-    if(couchbaseServersList == null) {
+    NamedList cbServers = (NamedList)params.get(CommonConstants.COUCHBASE_SERVERS_MARK);
+    if(cbServers != null) {
+      Map<String,String> cbServersMap = SolrParams.toMap(cbServers);
+      if(cbServersMap.size() > 0) {
+        couchbaseServersList = new ArrayList<String>(cbServersMap.values());
+      } else {
+        LOG.error("No Couchbase servers configured!");
+      }
+    } else {
       LOG.error("No Couchbase servers configured!");
+    }
+    if(couchbaseServersList == null || couchbaseServersList.size() == 0) {
+      LOG.info("Setting default cauchbase host.");
+      couchbaseServersList = new ArrayList<String>();
+      couchbaseServersList.add("localhost:8091");
     }
     clusterName = (String) params.get(CommonConstants.CLUSTER_NAME_MARK);
     if(clusterName == null) {
@@ -143,9 +155,11 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     }
     //configure Couchbase REST client
     CredentialsProvider credsProvider = new BasicCredentialsProvider();
-    for(String host : couchbaseServersList) {
-      credsProvider.setCredentials(new AuthScope(null, -1, null),
-          new UsernamePasswordCredentials(username, password));
+    if(couchbaseServersList != null && couchbaseServersList.size() > 0) {
+      for(String host : couchbaseServersList) {
+        credsProvider.setCredentials(new AuthScope(null, -1, null),
+            new UsernamePasswordCredentials(username, password));
+      }
     }
     httpClient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
   }
