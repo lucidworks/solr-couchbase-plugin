@@ -1,7 +1,10 @@
 <ivysettings>
-  <settings defaultResolver="maven2"/>
+  <settings defaultResolver="maven"/>
 
   <resolvers>
-    <ibiblio name="maven2" m2compatible="true" />
+    <chain name="maven" returnFirst="true">
+      <ibiblio name="maven2" m2compatible="true" />
+      <ibiblio name="restlet" m2compatible="true" root="http://maven.restlet.org/" />
+    </chain>
   </resolvers>
 </ivysettings>
