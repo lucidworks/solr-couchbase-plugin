@@ -13,7 +13,7 @@ public class SolrUtils {
   /**
    * Set of suffixes being recognixed by the mapping methods
    */
-  private static final Set<String> suffixes = new HashSet<String>(Arrays.asList("_b", "_d", "_dt", "_f", "_i", "_l", "_txt", "_s"));
+  private static final Set<String> suffixes = new HashSet<String>(Arrays.asList("_b", "_d", "_dt", "_f", "_i", "_l", "_txt", "_s", "_ss"));
 
   public static Set<String> getSuffixes() {
     return suffixes;

@@ -1,6 +1,6 @@
 --- solrconfig.orig.xml	2014-05-14 19:40:34.000000000 -0700
 +++ solrconfig.xml	2014-08-27 14:02:32.046369709 -0700
-@@ -1868,4 +1868,45 @@
+@@ -1868,4 +1868,46 @@
      <defaultQuery>*:*</defaultQuery>
    </admin>
  
@@ -18,9 +18,10 @@
 +      <str name="clusterName">solr</str>
 +    </lst>
 +    <lst name="bucket">
-+      <str name="name">default</str>
++      <str name="name">beer-sample</str>
 +      <str name="splitpath">/</str>
 +      <lst name="fieldmappings">
++        <str name="address">address_ss:/address</str>
 +        <str name="all">/*</str>
 +      </lst>
 +    </lst>
