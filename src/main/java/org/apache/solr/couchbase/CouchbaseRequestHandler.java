@@ -217,7 +217,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     } catch (KeeperException | InterruptedException e1) {
       LOG.error("Error while updating Cluster State!", e1);
     }
-    String collection = getCore().getName();
+    String collection = getCore().getCoreDescriptor().getCloudDescriptor().getCollectionName();
     Map<String,Slice> slices = zkStateReader.getClusterState().getActiveSlicesMap(collection);
     List<String> sliceNames = new ArrayList<String>(slices.keySet());
     Collections.sort(sliceNames);
