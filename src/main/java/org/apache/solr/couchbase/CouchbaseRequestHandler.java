@@ -65,7 +65,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private Settings settings;
   private SolrCore core;
   private UpdateRequestProcessorChain processorChain;
-  private static SolrZkClient zkClient;
+  private SolrZkClient zkClient;
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
   private ElectionWatcher electionWatcher;

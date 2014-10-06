@@ -11,6 +11,10 @@ import java.util.Map.Entry;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.xml.builders.BooleanQueryBuilder;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
@@ -26,6 +30,7 @@ import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.CommitUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
+import org.apache.solr.util.RefCounted;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.noggit.JSONParser;
 import org.noggit.JSONUtil;
@@ -33,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.couchbase.capi.CAPIBehavior;
+import com.ibm.icu.text.DateFormat.BooleanAttribute;
 
 public class SolrCAPIBehaviour implements CAPIBehavior {
   
@@ -128,39 +134,43 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     long start = System.currentTimeMillis();
     activeBulkDocsRequests.inc();
     
-    SolrIndexSearcher searcher = handler.getCore().getSearcher().get();
     Map<String, Object> responseMap = null;
     
     String bucketName = getBucketNameFromDatabase(database);
     if(handler.getBucket(bucketName) != null) {
       responseMap = new HashMap<String, Object>();
         for (Entry<String, Object> entry : revsMap.entrySet()) {
+            RefCounted<SolrIndexSearcher> searcher = handler.getCore().getSearcher();
             String id = entry.getKey();
             String revs = (String) entry.getValue();
-            TermQuery query = new TermQuery(new Term(CommonConstants.ID_FIELD, id + "*"));
+            TermQuery tQuery = new TermQuery(new Term(id));
+            PrefixQuery pQuery = new PrefixQuery(new Term(id + "-"));
+            BooleanQuery query = new BooleanQuery();
+            query.add(tQuery, Occur.SHOULD);
+            query.add(pQuery, Occur.SHOULD);
             try {
-              DocSet docs = searcher.getDocSet(query, (DocSet)null);
+              DocSet docs = searcher.get().getDocSet(query, (DocSet)null);
               DocIterator iterator = docs.iterator();
               if(docs.size()>0) {
                 while(iterator.hasNext()) {
                   int docId = iterator.nextDoc();
-                  if(!revs.equals(searcher.doc(docId).get(CommonConstants.REVISION_FIELD))) {
+                  if(!revs.equals(searcher.get().doc(docId).get(CommonConstants.REVISION_FIELD))) {
                     Map<String, Object> rev = new HashMap<String, Object>();
                     rev.put("missing", revs);
                     responseMap.put(id, rev);
                   }
                 }
+              } else {
+            	  Map<String, Object> rev = new HashMap<String, Object>();
+                rev.put("missing", revs);
+                responseMap.put(id, rev);
               }
             } catch (IOException e) {
-              // TODO Auto-generated catch block
-              e.printStackTrace();
+              LOG.error("Could not do revsDiff!", e);
+            } finally {
+            	searcher.decref();
             }
         }
-    }
-    try {
-      searcher.close();
-    } catch (IOException e) {
-      LOG.error("Could not close searcher!", e);
     }
     long end = System.currentTimeMillis();
     meanRevsDiffRequests.inc(end - start);
