@@ -1,7 +1,7 @@
 solr-couchbase-plugin
 =====================
 
-This plugin allows to import CouchBase data to Solr. It uses the Cross-datacenter Replication (XDCR) feature of Couchbase Server 2.0 to transfer data continuously.
+This plugin allows to import CouchBase data to Solr. It uses the Cross-datacenter Replication (XDCR) feature of Couchbase Server 2.0 to transfer data continuously. It is confirmed to run with Solr 4.10 and Couchbase 2.5.1 releases.
 
 # Plugin configuration
 
