@@ -5,13 +5,22 @@ public class CommonConstants {
   /** Solr plugin params */
   public static final String HANDLER_PARAMS = "params";
   public static final String BUCKET_MARK = "bucket";
-  public static final String COUCHBASE_SERVERS_MARK = "couchbaseServers";
-  public static final String CLUSTER_NAME_MARK = "clusterName";
+  		/** couchbase XDCR settings */
+  public static final String COUCHBASE_SERVER_FIELD = "couchbaseServer";
+  public static final String COUCHBASE_CLUSTER_NAME_FIELD = "clusterName";
+  public static final String COUCHBASE_HOST_IP_FIELD = "ipAddress";
+  public static final String COUCHBASE_USERNAME_FIELD = "couchbaseUsername";
+  public static final String COUCHBASE_PASSWORD_FIELD = "couchbasePassword";
+  public static final String COUCHBASE_FROM_BUCKET_INFO_FIELD = "bucketInfo";
+  public static final String COUCHBASE_FROM_BUCKET_NAME_FIELD = "fromBucketName";
+  public static final String COUCHBASE_TO_BUCKET_NAME_FIELD = "toBucketName";
+  
   public static final String FIELD_MAPPING_FIELD = "fieldmappings";
   public static final String SPLITPATH_FIELD = "splitpath";
   public static final String USERNAME_FIELD = "username";
   public static final String PASSWORD_FIELD = "password";
   public static final String NUM_VBUCKETS_FIELD = "numVBuckets";
+  public static final String HOST_IP = "hostIP";
   public static final String PORT_FIELD = "port";
   public static final String NAME_FIELD = "name";
   public static final String COMMIT_AFTER_BATCH_FIELD = "commitAfterBatch";

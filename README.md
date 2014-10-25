@@ -63,7 +63,26 @@ It is required to configure Couchbase buckets to index data from in the solrconf
     <int name="numVBuckets">1024</int>
     <bool name="commitAfterBatch">false</bool>
     <bool name="optimize">false</bool>
+    
+    <!-- Optional, setting for Couchbase XDCR remote cluster and replication -->
+    <lst name="couchbaseServer">
+    	<str name="ipAddress">127.0.0.1</str>
+        <str name="couchbaseUsername">Administrator</str>
+        <str name="couchbasePassword">password</str>
+        <str name="clusterName">Solr</str>
+
+        <lst name="bucketInfo">
+        	<str name="fromBucketName">test</str>
+            <str name="toBucketName">default</str>
+        </lst>
+
+        <lst name="bucketInfo">
+        	<str name="fromBucketName">program</str>
+       		<str name="toBucketName">default</str>
+        </lst>
+    </lst>
   </lst>
+  
   <lst name="bucket">
     <str name="name">default</str>
     <str name="splitpath">/</str>
@@ -90,6 +109,15 @@ It is required to configure Couchbase buckets to index data from in the solrconf
   - port - A port number on which this plugin will register itself as a Couchbase replica.
   - numVBuckets - A number of VBuckets used by this Couchbase replica. Couchbase Server on Mac OS X uses 64 vBuckets as opposed to the 1024 vBuckets used by other platforms. **Couchbase clusters with mixed platforms are not supported.** It is required that numVBuckets is identical on the Couchbase server and Solr plugin.
   - commitAfterBatch - A flag specifying whether this plugin should commit documents to Solr after every batch of documents or when all the documents are retrieved from Couchbase.
+  
+  - couchbaseServer - Optional, a list with attributes that are required for creating Couchbase XDCR remote cluster and/or XDCR replication.
+  - ipAddress - The IP address at where this plugin is running. Required if you have couchbaseServer field.
+  - couchbaseUsername - The username of target Couchbase instance. With this field the plugin can get authorized by Couchbase. Required if you have couchbaseServer field.
+  - couchbasePassword - The password of target Couchbase instance. With this field the plugin can get authorized by Couchbase. Required if you have couchbaseServer field.
+  - clusterName - The cluster name that you want to create Couchbase XDCR remote cluster with. Required if you have couchbaseServer field.
+  - bucketInfo - Optional, a list with attributes that are required for crteating Couchbase XDCR replication.
+  - fromBucketName - The Couchbase bucket name where you want to pull data from. Required if you have bucketInfo field.
+  - toBucketName - The destination bucket name where you want to push data to. Basically you have to use the names that are specified in "bucket" list. Required if you have bucketInfo field.
   
 * bucket - a list with bucket parameters required to perform a synchronisation with Couchbase. Multiple lists of this type are allowed.
   - name - Bucket name - must be unique
