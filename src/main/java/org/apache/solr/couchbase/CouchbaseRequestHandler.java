@@ -56,7 +56,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private CouchbaseBehavior couchbaseBehaviour;
   private CAPIBehavior capiBehaviour;
   private CAPIServer server;
-  private String host = "127.0.0.1";
+  private String host;
   private int port = -1;
   private String username;
   private String password;
@@ -69,7 +69,6 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private ZkStateReader zkStateReader;
   private boolean commitAfterBatch;
   private ElectionWatcher electionWatcher;
-  private List<String> couchbaseServersList;
   private String clusterName;
   private CloseableHttpClient httpClient;
   private HttpClientContext httpContext;
@@ -81,6 +80,8 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private Map<String, String> documentTypeParentFields;
   private Map<String, String> documentTypeRoutingFields;
   private Map<String,Bucket> buckets = new HashMap<String, Bucket>();
+  
+  private NamedList couchbaseServer = null;
   
   @Override
   public String getSource() { return null; }
@@ -119,31 +120,13 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   public void init(NamedList args) {
     super.init(args);
     Map<String,Object> params = toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
+    host = (params.get(CommonConstants.HOST_IP) == null) ? "127.0.0.1" : params.get(CommonConstants.HOST_IP).toString();
     username = params.get(CommonConstants.USERNAME_FIELD).toString();
     password = params.get(CommonConstants.PASSWORD_FIELD).toString();
     numVBuckets = (int) params.get(CommonConstants.NUM_VBUCKETS_FIELD);
     port = (int)params.get(CommonConstants.PORT_FIELD);
     commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
-    NamedList cbServers = (NamedList)params.get(CommonConstants.COUCHBASE_SERVERS_MARK);
-    if(cbServers != null) {
-      Map<String,String> cbServersMap = SolrParams.toMap(cbServers);
-      if(cbServersMap.size() > 0) {
-        couchbaseServersList = new ArrayList<String>(cbServersMap.values());
-      } else {
-        LOG.error("No Couchbase servers configured!");
-      }
-    } else {
-      LOG.error("No Couchbase servers configured!");
-    }
-    if(couchbaseServersList == null || couchbaseServersList.size() == 0) {
-      LOG.info("Setting default cauchbase host.");
-      couchbaseServersList = new ArrayList<String>();
-      couchbaseServersList.add("localhost:8091");
-    }
-    clusterName = (String) params.get(CommonConstants.CLUSTER_NAME_MARK);
-    if(clusterName == null) {
-      clusterName = "default";
-    }
+    
     List<NamedList<Object>> bucketslist = args.getAll(CommonConstants.BUCKET_MARK);
     for(NamedList<Object> bucket : bucketslist) {
       String name = (String)bucket.get(CommonConstants.NAME_FIELD);
@@ -153,15 +136,14 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       Bucket b = new Bucket(name, splitpath, fieldmappings);
       buckets.put(name, b);
     }
-    //configure Couchbase REST client
-    CredentialsProvider credsProvider = new BasicCredentialsProvider();
-    if(couchbaseServersList != null && couchbaseServersList.size() > 0) {
-      for(String host : couchbaseServersList) {
-        credsProvider.setCredentials(new AuthScope(null, -1, null),
-            new UsernamePasswordCredentials(username, password));
-      }
+    
+    couchbaseServer = (NamedList)params.get(CommonConstants.COUCHBASE_SERVER_FIELD);
+    if(couchbaseServer == null) {
+    	LOG.info("No Couchbase server configured!");
     }
-    httpClient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
+    else if(couchbaseServer != null && couchbaseServer.size() <= 0) {
+    	LOG.error("Missing content for Couchbase server!");
+    }
   }
   
   @Override
@@ -175,7 +157,7 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
     
     switch(action) {
     case "start"  :
-      handleStart();
+    	handleStart();
       break;
     case "stop" :
       handleStop();
@@ -209,6 +191,11 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
         checkIfIamLeader();
       } else {
         startCouchbaseReplica();
+        
+        // Create Couchbase XDCR replication after the plugin is activated
+    	if(couchbaseServer != null && couchbaseServer.size() > 0) {
+    		CouchbaseUtils.createCouchbaseXDCRReplications(couchbaseServer, host, String.valueOf(port), username, password);
+    	}
       }
     } else {
       LOG.info("CAPIServer already running.");
