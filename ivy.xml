@@ -70,7 +70,9 @@
     <dependency org="com.carrotsearch.randomizedtesting" name="randomizedtesting-runner" rev="2.1.6" conf="compile->default"/>
     <dependency org="com.carrotsearch.randomizedtesting" name="junit4-ant" rev="2.1.6" conf="compile->default"/>
     <dependency org="org.apache.ant" name="ant" rev="1.9.2" conf="test->default"/>
-    
+    <dependency org="org.codehaus.jettison" name="jettison" rev="1.3.3" conf="compile->default"/>
+    <dependency org="com.sun.jersey" name="jersey-bundle" rev="1.18.1" conf="compile->default"/>
+
     <!-- exludes -->
     <exclude org="org.eclipse.jetty.orbit" artifact="javax-servlet-working@karol.jar" matcher="exact"/>
   </dependencies>
