@@ -132,7 +132,7 @@ public class BucketMapServlet extends HttpServlet {
     /**
      * Return a fake bucket map for the requested bucket.
      *
-     * @param req
+     * @param resp
      * @param os
      * @param bucket
      * @throws IOException
