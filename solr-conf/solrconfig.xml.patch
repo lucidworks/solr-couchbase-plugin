@@ -6,10 +6,10 @@
  
 +  <requestHandler name="/couchbase" class="org.apache.solr.couchbase.CouchbaseRequestHandler">
 +    <lst name="params">
-+      <str name="username">admin</str>
-+      <str name="password">admin123</str>
++      <str name="username">Administrator</str>
++      <str name="password">password</str>
 +      <int name="port">9876</int>
-+      <int name="numVBuckets">1024</int>
++      <int name="numVBuckets">64</int>
 +      <bool name="commitAfterBatch">true</bool>
 +      <lst name="couchbaseServers">
 +        <str name="server1">127.0.0.1:8091</str>
