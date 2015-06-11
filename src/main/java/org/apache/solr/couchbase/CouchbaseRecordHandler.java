@@ -11,6 +11,9 @@ import java.util.Map;
 
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.JsonRecordReader.Handler;
+import org.apache.solr.couchbase.capi.SolrCAPIBehaviour;
+import org.apache.solr.couchbase.common.CommonConstants;
+import org.apache.solr.couchbase.common.SolrUtils;
 import org.apache.solr.request.SolrQueryRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

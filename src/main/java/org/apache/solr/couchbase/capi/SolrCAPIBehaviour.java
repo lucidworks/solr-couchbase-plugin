@@ -1,4 +1,4 @@
-package org.apache.solr.couchbase;
+package org.apache.solr.couchbase.capi;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,7 +11,6 @@ import java.util.Map.Entry;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queryparser.xml.builders.BooleanQueryBuilder;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.PrefixQuery;
@@ -20,6 +19,12 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.JsonRecordReader;
 import org.apache.solr.common.util.JsonRecordReader.Handler;
+import org.apache.solr.couchbase.CouchbaseRecordHandler;
+import org.apache.solr.couchbase.CouchbaseReplica;
+import org.apache.solr.couchbase.CouchbaseRequestHandler;
+import org.apache.solr.couchbase.common.CommonConstants;
+import org.apache.solr.couchbase.common.Counter;
+import org.apache.solr.couchbase.common.TypeSelector;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.response.SolrQueryResponse;
@@ -38,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.couchbase.capi.CAPIBehavior;
-import com.ibm.icu.text.DateFormat.BooleanAttribute;
 
 public class SolrCAPIBehaviour implements CAPIBehavior {
   
@@ -48,7 +52,8 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   private TypeSelector typeSelector;
   protected Map<String, String> documentTypeParentFields;
   protected Map<String, String> documentTypeRoutingFields;
-  protected CouchbaseRequestHandler handler;
+  protected CouchbaseReplica couchbase;
+  protected CouchbaseRequestHandler requestHandler;
   private boolean commitAfterBatch;
   
   protected Counter activeRevsDiffRequests;
@@ -57,8 +62,9 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   protected Counter meanBulkDocsRequests;
   protected Counter totalTooManyConcurrentRequestsErrors;
 
-  public SolrCAPIBehaviour(CouchbaseRequestHandler handler, TypeSelector typeSelector, Map<String, String> documentTypeParentFields, Map<String, String> documentTypeRoutingFields, boolean commitAfterBatch) {
-    this.handler = handler;
+  public SolrCAPIBehaviour(CouchbaseReplica couchbase, TypeSelector typeSelector, Map<String, String> documentTypeParentFields, Map<String, String> documentTypeRoutingFields, boolean commitAfterBatch) {
+    this.couchbase = couchbase;
+    this.requestHandler = couchbase.getRequestHandler();
     this.typeSelector = typeSelector;
     this.documentTypeParentFields = documentTypeParentFields;
     this.documentTypeRoutingFields = documentTypeRoutingFields;
@@ -79,7 +85,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
   
   public String databaseExists(String database) {
     String bucketName = getBucketNameFromDatabase(database);
-    if(handler.getBucket(bucketName) != null) {
+    if(couchbase.getBucket(bucketName) != null) {
         return null;
     }
     return "missing";
@@ -137,10 +143,10 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     Map<String, Object> responseMap = null;
     
     String bucketName = getBucketNameFromDatabase(database);
-    if(handler.getBucket(bucketName) != null) {
+    if(couchbase.getBucket(bucketName) != null) {
       responseMap = new HashMap<String, Object>();
         for (Entry<String, Object> entry : revsMap.entrySet()) {
-            RefCounted<SolrIndexSearcher> searcher = handler.getCore().getSearcher();
+            RefCounted<SolrIndexSearcher> searcher = requestHandler.getCore().getSearcher();
             String id = entry.getKey();
             String revs = (String) entry.getValue();
             TermQuery tQuery = new TermQuery(new Term(id));
@@ -184,7 +190,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     activeBulkDocsRequests.inc();
     
     String bucketName = getBucketNameFromDatabase(database);
-    SolrQueryRequest req = new SolrQueryRequestBase(handler.getCore(), new SolrParams() {
+    SolrQueryRequest req = new SolrQueryRequestBase(requestHandler.getCore(), new SolrParams() {
       
       @Override
       public String[] getParams(String param) {
@@ -208,7 +214,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     List<Object> bulkDocsResult = new ArrayList<Object>();
     Map<String,String> revisions = new HashMap<String, String>();
     
-    if(handler.getBucket(bucketName) != null) {
+    if(couchbase.getBucket(bucketName) != null) {
 
         for (Map<String, Object> doc : docs) {
 
@@ -297,8 +303,8 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
             }
             
             //extract and map json fields
-            JsonRecordReader rr = JsonRecordReader.getInst(handler.getBucket(bucketName).getSplitpath(),
-                new ArrayList<String>(handler.getBucket(bucketName).getFieldmapping().values()));
+            JsonRecordReader rr = JsonRecordReader.getInst(couchbase.getBucket(bucketName).getSplitpath(),
+                new ArrayList<String>(couchbase.getBucket(bucketName).getFieldmapping().values()));
             if(jsonString == null) {
               jsonString="";
             }
@@ -477,13 +483,13 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     return null;
   }
   
-  boolean addDoc(SolrInputDocument doc, SolrQueryRequest req) {
+  public boolean addDoc(SolrInputDocument doc, SolrQueryRequest req) {
     boolean success = false;
     try {
       AddUpdateCommand command = new AddUpdateCommand(req);
       command.solrDoc = doc;
       SolrQueryResponse rsp = new SolrQueryResponse();
-      UpdateRequestProcessor processor = handler.getProcessorChain().createProcessor(req, rsp);
+      UpdateRequestProcessor processor = requestHandler.getProcessorChain().createProcessor(req, rsp);
       processor.processAdd(command);
       success = true;
     } catch (Exception e) {
@@ -499,7 +505,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
       DeleteUpdateCommand delCmd = new DeleteUpdateCommand(req);
       delCmd.setId(id.toString());
       SolrQueryResponse rsp = new SolrQueryResponse();
-      UpdateRequestProcessor processor = handler.getProcessorChain().createProcessor(req, rsp);
+      UpdateRequestProcessor processor = requestHandler.getProcessorChain().createProcessor(req, rsp);
       processor.processDelete(delCmd);
       success = true;
     } catch (IOException e) {
@@ -512,7 +518,7 @@ public class SolrCAPIBehaviour implements CAPIBehavior {
     try {
       CommitUpdateCommand commit = new CommitUpdateCommand(req,false);
       SolrQueryResponse rsp = new SolrQueryResponse();
-      UpdateRequestProcessor processor = handler.getProcessorChain().createProcessor(req, rsp);
+      UpdateRequestProcessor processor = requestHandler.getProcessorChain().createProcessor(req, rsp);
       processor.processCommit(commit);
     } catch (Exception e) {
       LOG.error("Exception while solr commit.", e);

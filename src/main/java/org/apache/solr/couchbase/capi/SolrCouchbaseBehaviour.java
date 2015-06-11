@@ -1,4 +1,4 @@
-package org.apache.solr.couchbase;
+package org.apache.solr.couchbase.capi;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -6,16 +6,21 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.common.cloud.ZkNodeProps;
+import org.apache.solr.couchbase.CouchbaseReplica;
+import org.apache.solr.couchbase.CouchbaseRequestHandler;
+import org.apache.solr.couchbase.Utils;
 
 import com.couchbase.capi.CouchbaseBehavior;
 
 public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
 
   CouchbaseRequestHandler handler;
+  CouchbaseReplica couchbase;
   String poolUUID;
   
-  public SolrCouchbaseBehaviour(CouchbaseRequestHandler handler) {
-    this.handler = handler;
+  public SolrCouchbaseBehaviour(CouchbaseReplica couchbase) {
+    this.couchbase = couchbase;
+    this.handler = couchbase.getRequestHandler();
     poolUUID = Utils.randomID();
   }
   
@@ -43,11 +48,11 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
   }
   
   public List<String> getBucketsInPool(String pool) {
-      return new ArrayList<String>(handler.getBuckets().keySet());
+      return new ArrayList<String>(couchbase.getBuckets().keySet());
   }
   
   public String getBucketUUID(String pool, String bucket) {
-      if(handler.getBucket(bucket) != null) {
+      if(couchbase.getBucket(bucket) != null) {
           return "00000000000000000000000000000000";
       }
       return null;
@@ -76,12 +81,12 @@ public class SolrCouchbaseBehaviour implements CouchbaseBehavior{
           }
         } else {  
           Map<String, Object> nodePorts = new HashMap<String, Object>();
-          nodePorts.put("direct", handler.getPort());
+          nodePorts.put("direct", couchbase.getClientPort());
   
           Map<String, Object> node = new HashMap<String, Object>();
           node.put("couchApiBase",
-                  String.format("http://%s:%s/", handler.getHost(), handler.getPort()));
-          node.put("hostname", handler.getHost() + ":" + handler.getPort());
+                  String.format("http://%s:%s/", couchbase.getClientHost(), couchbase.getClientPort()));
+          node.put("hostname", couchbase.getClientHost() + ":" + couchbase.getClientPort());
           node.put("ports", nodePorts);
   
           nodes.add(node);

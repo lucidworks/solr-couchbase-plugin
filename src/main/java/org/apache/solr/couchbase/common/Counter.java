@@ -1,4 +1,4 @@
-package org.apache.solr.couchbase;
+package org.apache.solr.couchbase.common;
 
 public class Counter {
 

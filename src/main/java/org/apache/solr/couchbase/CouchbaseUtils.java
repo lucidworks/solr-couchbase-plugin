@@ -8,8 +8,8 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriBuilder;
 
 import org.codehaus.jettison.json.*;
-
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.couchbase.common.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,5 +169,10 @@ public class CouchbaseUtils {
 		    	LOG.warn("CouchbaseUtils.createReplication : " + "Failed to create Couchbase replication from Couchbase bukcet = " + fromBuckets.get(i) + " to Couchbase client bucket = " + toBuckets.get(i));
 		    }
 	    }
+    }
+    
+    public static int getNumVBuckets() {
+    	// TODO get num_vbuckets from Couchbase Server
+    	return 64;
     }
 }

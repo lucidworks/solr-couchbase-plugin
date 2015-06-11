@@ -6,6 +6,7 @@ import java.util.Map;
 
 import junit.framework.TestCase;
 
+import org.apache.solr.couchbase.common.SolrUtils;
 import org.junit.Test;
 
 public class SolrUtilsTest extends TestCase {

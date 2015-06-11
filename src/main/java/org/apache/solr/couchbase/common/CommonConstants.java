@@ -1,11 +1,11 @@
-package org.apache.solr.couchbase;
+package org.apache.solr.couchbase.common;
 
 public class CommonConstants {
 
   /** Solr plugin params */
   public static final String HANDLER_PARAMS = "params";
   public static final String BUCKET_MARK = "bucket";
-  		/** couchbase XDCR settings */
+  /** couchbase XDCR settings */
   public static final String COUCHBASE_SERVER_FIELD = "couchbaseServer";
   public static final String COUCHBASE_CLUSTER_NAME_FIELD = "clusterName";
   public static final String COUCHBASE_HOST_IP_FIELD = "ipAddress";
