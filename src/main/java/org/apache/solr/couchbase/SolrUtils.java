@@ -20,8 +20,8 @@ public class SolrUtils {
   }
   /**
    * Method mapping field names to Solr dynamic fields based on the value type
-   * @param jsonMap A Map<String,Object> representing JSON document
-   * @param fieldmapping A map of name -> field_mapping entries. Field mapping stucture is <dynamic_field>:<JSON_path>.
+   * @param jsonMap A Map&lt;String,Object&gt; representing JSON document
+   * @param fieldmapping A map of name -&gt; field_mapping entries. Field mapping stucture is &lt;dynamic_field&gt;:&lt;JSON_path&gt;.
    */
   public static Map<String, String> mapToSolrDynamicFields(Map<String,Object> jsonMap) {
     Map<String, String> solrMapping = new HashMap<String, String>();

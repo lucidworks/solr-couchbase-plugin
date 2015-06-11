@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 
 public class CouchbaseRecordHandler implements Handler{
   
-  private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRequestHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CouchbaseRecordHandler.class);
   
   List<Object> bulkDocsResult = new ArrayList<Object>();
   Map<String,String> revisions = new HashMap<String, String>();
