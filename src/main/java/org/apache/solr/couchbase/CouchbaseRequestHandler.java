@@ -144,13 +144,36 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
       } else {
         couchbase.startCouchbaseReplica();
         
-        // Create Couchbase XDCR replication after the plugin is activated
-        if(couchbaseServer != null && couchbaseServer.size() > 0) {
-          CouchbaseUtils.createCouchbaseXDCRReplications(couchbaseServer, host, String.valueOf(port), username, password);
+        //setup XDCR
+        String clientUuid = couchbase.getRemoteClusterUuid();
+        boolean exists = couchbase.checkRemoteClusterExists(clientUuid);
+        if(!exists) {
+          exists = couchbase.createRemoteCluster(clientUuid);
+        }
+        if(exists) {
+          try {
+            couchbase.createReplication(clientUuid);
+          } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+          }
+        }
+        while(couchbase.isRunning()) {
+          try {
+            Thread.sleep(10000);
+          } catch (InterruptedException e) {
+          }
+        }
+        try {
+          couchbase.close();
+          if(!couchbase.isRunning()) {
+            LOG.info("Couchbase Replica STOPPED successfully.");
+          }
+        } catch (Exception e) {
+          LOG.error(e.getMessage(), e);
         }
       }
     } else {
-      LOG.info("CAPIServer already running.");
+      LOG.info("Couchbase Replica is already RUNNING.");
     }
   }
   
