@@ -89,6 +89,8 @@ public class CouchbaseReplica {
     this.clusterName = (params.get(CommonConstants.COUCHBASE_CLUSTER_NAME_FIELD) == null) ? "cluster-" + System.currentTimeMillis() :
       String.valueOf(params.get(CommonConstants.COUCHBASE_CLUSTER_NAME_FIELD));
     this.commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
+    this.buckets = new HashMap<String, Bucket>();
+    this.replications = new ArrayList<String>();
     
     for(NamedList<Object> bucket : bucketsList) {
       String name = (String)bucket.get(CommonConstants.NAME_FIELD);

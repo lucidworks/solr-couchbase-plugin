@@ -148,7 +148,7 @@
   </target>
 
   <target name="get-solr" unless="solrzip.exists" depends="solr-check">
-    <get src="http://archive.apache.org/dist/lucene/solr/${solr.server.version}/solr-${solr.server.version}.zip"
+    <get src="http://ftp.ps.pl/pub/apache/lucene/solr/${solr.server.version}/solr-${solr.server.version}.zip"
                 dest="${build-lib.dir}/solr-${solr.server.version}.zip"/>
   </target>
   
@@ -163,83 +163,135 @@
   </target>
   
   <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-solr-jetty, ivy-resolve-runtime" >
-    <prep-solr solr.dir="${solr.dir}" solr.version="${solr.server.version}"/>
+    <prep-solr solr.zip.dir="${exploded.solr.zip.dir}" solr.version="${solr.server.version}"/>
   </target>
   
   <macrodef name="prep-solr">
-    <attribute name="solr.dir"/>
+    <attribute name="solr.zip.dir"/>
     <attribute name="solr.version"/>
     <sequential>
-      <echo>Unpacking Solr @{solr.version} into @{solr.dir} from module ${ant.project.name}</echo>
-
-      <ivy:resolve conf="solr.war" log="download-only"/>
-      <ivy:retrieve conf="solr.war" type="war" pattern="@{solr.dir}/webapps/[artifact].[ext]"/>
-
-      <unzip src="${build-lib.dir}/solr-@{solr.version}.zip" dest="@{solr.dir}">
-        <patternset>
-          <include name="solr-@{solr.version}/example/contexts/**"/>
-          <include name="solr-@{solr.version}/example/etc/**"/>
-          <include name="solr-@{solr.version}/example/resources/**"/>
-          <include name="solr-@{solr.version}/example/solr/**"/>
-        </patternset>
+      <echo>Unpacking Solr @{solr.version} into @{solr.zip.dir} from module ${ant.project.name}</echo>
+      
+      <!-- unzip Solr -->
+      <unzip src="${build-lib.dir}/solr-@{solr.version}.zip" dest="@{solr.zip.dir}">
         <mapper>
-          <globmapper from="solr-@{solr.version}/example/*" to="*"/>
+          <globmapper from="solr-@{solr.version}/*" to="*"/>
         </mapper>
       </unzip>
-
-      <ivy:resolve conf="solr.jetty" log="download-only"/>
-      <ivy:retrieve conf="solr.jetty" pattern="@{solr.dir}/lib/[artifact]-[revision].[ext]"/>
-      <move tofile="@{solr.dir}/lib/servlet-api-3.0.jar" overwrite="true">
-        <fileset dir="@{solr.dir}/lib" includes="javax.servlet-3.0.0*"/>
-      </move>
-
-      <ivy:resolve conf="solr.start" log="download-only"/>
-      <ivy:retrieve conf="solr.start" pattern="@{solr.dir}/[artifact].[ext]"/>
-
-      <ivy:resolve conf="solr.logging" log="download-only"/>
-      <ivy:retrieve conf="solr.logging" type="jar,bundle" pattern="@{solr.dir}/lib/ext/[artifact]-[revision].[ext]"/>
-
-      <delete dir="${build.dir}/solr-war"/>
-      <mkdir dir="${build.dir}/solr-war"/>
-      <unwar src="@{solr.dir}/webapps/solr.war" dest="${build.dir}/solr-war">
-        <patternset>
-          <include name="**/*"/>
-        </patternset>
-      </unwar>
       
-      <!--<delete file="${build.dir}/solr-war/WEB-INF/lib/commons-io*.jar"/>-->
-      <copy todir="${build.dir}/solr-war/WEB-INF/lib">
+      <!-- copy Solr war -->
+      <copy todir="${solr.war.dir}">
+        <!--<fileset dir="${solr.dir}/example/webapps/" includes="solr.war"/>-->
+        <fileset dir="@{solr.zip.dir}/server/webapps/" includes="solr.war"/>
+      </copy>
+      <chmod file="@{solr.zip.dir}/bin/solr" perm="755"/>
+    	
+      <!-- explode Solr war -->
+      <unwar src="${solr.war.dir}/solr.war" dest="${exploded.solr.war.dir}">
+      </unwar>
+    
+      <!-- copy Solr logging libs -->
+      <ivy:resolve conf="solr.logging" file="${basedir}/ivy.xml" log="download-only"/>
+      <ivy:retrieve conf="solr.logging" pattern="${exploded.solr.war.dir}/WEB-INF/lib/[artifact]-[revision].[ext]"/>
+      
+      <!-- copy Solr config -->
+      <copy todir="${solr.dir}">
+        <fileset dir="@{solr.zip.dir}/server/solr/" includes="**"/>
+      </copy>
+    
+      <!-- Copy jetty-runner -->
+      <ivy:resolve conf="solr.jetty.runner" file="${basedir}/ivy.xml" log="download-only"/>
+      <ivy:retrieve conf="solr.jetty.runner" pattern="${solr.dir}/[artifact]-[revision].[ext]"/>
+    
+      <!-- copy project libs -->
+      <copy todir="${exploded.solr.war.dir}/WEB-INF/lib">
         <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
         <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
         <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
-      </copy>
-      <war destfile="${build.dir}/solr-war/solr.war" webxml="${build.dir}/solr-war/WEB-INF/web.xml">
-        <fileset dir="${build.dir}/solr-war">
-          <include name="**/*" />
-        </fileset>
-      </war>
-      <copy tofile="@{solr.dir}/webapps/solr.war" overwrite="true">
-        <fileset file="${build.dir}/solr-war/solr.war"/>
       </copy>
     </sequential>
   </macrodef>
   
   <target name="patch-solr" depends="check-patches-exist, prep-solr">
-    <patch-solr original.file="${solr.dir}/solr/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
-    <patch-solr original.file="${solr.dir}/solr/collection1/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.dir}/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <patch-solr original.file="${solr.dir}/configsets/basic_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.dir}/configsets/data_driven_schema_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.dir}/configsets/sample_techproducts_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
   </target>
 
   <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr">
-    <delete dir="${solr.dir}/solr-webapp/webapp"/>
-
-    <java dir="${solr.dir}" jar="${solr.dir}/jetty-start.jar" fork="true" failonerror="true">
-      <jvmarg line="-Djava.awt.headless=true"/>
-      <jvmarg line="-Xmx${heap.size}"/>
+    <!--<delete dir="${solr.dir}/solr-webapp/webapp"/>-->
+    <echo message="Starting standalone Solr, logging to ${build.dir}/solr-standalone/jetty.stderrout.log"></echo>
+    <java dir="${solr.dir}" jar="${solr.dir}/jetty-runner-${jetty.runner.version}.jar" fork="true" spawn="true">
+      <jvmarg line="${solr.jvm.args}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
+      <arg line="--port ${solr.port}"/>
+      <arg line="--stop-port ${solr.stop.port}"/>
+      <arg line="--stop-key STOP.SOLR"/>
+      <arg line="--path /solr"/>
+      <arg line="--log ${solr.dir}/jetty.request.log"/>
+      <arg line="--out ${solr.dir}/jetty.stderrout.log"/>
+      <arg value="${exploded.solr.war.dir}"/>
+      <sysproperty key="java.awt.headless" value="true"/>
+      <sysproperty key="solr.solr.home" value="${solr.dir}"/>
+      <sysproperty key="host" value="localhost"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
-      <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
-      <sysproperty key="STOP.KEY" value="srsly.stop"/>
     </java>
+  </target>
+
+  <target name="wait-for-solr" depends="run-solr">
+    <waitfor maxwait="${solrStartupMaxWaitSeconds}" maxwaitunit="second" timeoutproperty="solrStandaloneStartupTimeout">
+      <and>
+        <socket server="localhost" port="${solr.port}"/>
+        <http url="http://localhost:${solr.port}/solr"/>
+        <http url="http://localhost:${solr.port}/solr/admin/info/system"/>
+      </and>
+    </waitfor>
+  </target>
+
+  <target name="start-solr-standalone" depends="wait-for-solr">
+  <!-- create default core -->
+    <copy todir="${solr.dir}/collection1">
+      <fileset dir="${solr.dir}/configsets/sample_techproducts_configs/" includes="**"/>
+    </copy>
+    <condition property="createCoreStatus" value="true">
+      <http url="http://localhost:${solr.port}/solr/admin/cores?action=CREATE&amp;name=collection1&amp;instanceDir=collection1"/>
+    </condition>
+  </target>
+
+
+  <target name="stop">
+    <exec dir="${exploded.solr.zip.dir}" executable="bin/solr">
+      <arg line="stop -p ${solr.port}" />
+    </exec>
+  </target>
+
+  <!-- Stop two standalone Solr -->
+  <target name="stop-solr-standalone">
+    <!-- Stop second server -->
+    <java dir="${solr.dir}" jar="${solr.dir}/jetty-runner-${jetty.runner.version}.jar" fork="true" spawn="true">
+      <jvmarg line="-Djava.awt.headless=true"/>
+      <sysproperty key="solr.solr.home" value="${solr.dir}"/>
+      <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
+      <sysproperty key="STOP.KEY" value="STOP.SOLR"/>
+      <!--<arg value="- -stop"/>-->
+    </java>
+    <echo message="Jetty stop command `java -jar ${solr.dir}/jetty-runner-${jetty.runner.version}.jar -DSTOP.PORT=${solr.stop.port} -DSTOP.KEY=STOP.SOLR --stop` command returned: ${jetty.stop.result}"/>
+
+  <!--
+    <sleep seconds="10"/>
+    <sequential>
+      <waitfor maxwait="120" maxwaitunit="second" timeoutproperty="timeout">
+        <not>
+          <or>
+            <socket server="localhost" port="${solr.port}"/>
+            <socket server="localhost" port="${solr.stop.port}"/>
+          </or>
+        </not>
+      </waitfor>
+      <fail if="timeout" message="Solr standalone failed to shutdown in 120 seconds"/>
+    </sequential>
+    -->
   </target>
   
   <!-- Run two node SolrCloud cluster -->
