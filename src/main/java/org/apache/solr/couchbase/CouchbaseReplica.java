@@ -77,10 +77,10 @@ public class CouchbaseReplica {
   
   public CouchbaseReplica(CouchbaseRequestHandler handler, Map<String,Object> params, List<NamedList<Object>> bucketsList) {
     this.requestHandler = handler;
-    this.serverHost = (params.get(CommonConstants.HOST_IP) == null) ? "127.0.0.1" : String.valueOf(params.get(CommonConstants.HOST_IP));
-    this.serverPort = 8091;
-    this.clientHost = "127.0.0.1";
-    this.clientPort = (int)params.get(CommonConstants.PORT_FIELD);
+    this.serverHost = (params.get(CommonConstants.SERVER_HOST) == null) ? "127.0.0.1" : String.valueOf(params.get(CommonConstants.SERVER_HOST));
+    this.serverPort = (int)params.get(CommonConstants.SERVER_PORT);
+    this.clientHost = (params.get(CommonConstants.CLIENT_HOST) == null) ? "127.0.0.1" : String.valueOf(params.get(CommonConstants.CLIENT_HOST));
+    this.clientPort = (int)params.get(CommonConstants.CLIENT_PORT);
     this.serverUsername = String.valueOf(params.get(CommonConstants.USERNAME_FIELD));
     this.serverPassword = String.valueOf(params.get(CommonConstants.PASSWORD_FIELD));
     this.clientUsername = this.serverUsername;
@@ -100,9 +100,6 @@ public class CouchbaseReplica {
       Bucket b = new Bucket(name, splitpath, fieldmappings);
       buckets.put(name, b);
     }
-    
-    this.buckets = new HashMap<String, Bucket>();
-    this.replications = new ArrayList<String>();
     
     this.client = createJerseyClient();
     this.couchbaseService = createCouchbaseServiceTarget();

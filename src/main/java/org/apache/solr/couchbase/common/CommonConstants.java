@@ -20,8 +20,10 @@ public class CommonConstants {
   public static final String USERNAME_FIELD = "username";
   public static final String PASSWORD_FIELD = "password";
   public static final String NUM_VBUCKETS_FIELD = "numVBuckets";
-  public static final String HOST_IP = "hostIP";
-  public static final String PORT_FIELD = "port";
+  public static final String SERVER_HOST = "server_host";
+  public static final String SERVER_PORT = "server_port";
+  public static final String CLIENT_HOST = "client_host";
+  public static final String CLIENT_PORT = "client_port";
   public static final String NAME_FIELD = "name";
   public static final String COMMIT_AFTER_BATCH_FIELD = "commitAfterBatch";
   /** Select the update processor chain to use.  A RequestHandler may or may not respect this parameter */
