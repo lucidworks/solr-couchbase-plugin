@@ -257,17 +257,23 @@ public class CouchbaseReplica {
         .request()
         .post(Entity.entity(formData, MediaType.APPLICATION_FORM_URLENCODED_TYPE));
     // TODO XXX Use Jackson
-    JSONObject entity = response.readEntity(JSONObject.class);
+    String respString = response.readEntity(String.class);
     if(response.getStatus() == 200) {
+      JSONObject entity;
       try {
-        remoteClusterUuid = entity.getString("uuid");
-      } catch (JSONException e) {
-        LOG.error("Could not parse response!", e);
+        entity = new JSONObject(respString);
+        try {
+          remoteClusterUuid = entity.getString("uuid");
+        } catch (JSONException e) {
+          LOG.error("Could not parse response!", e);
+        }
+        LOG.info("Remote cluter = " + clusterName + " created.");
+        return true;
+      } catch (JSONException e1) {
+        LOG.error("Remote cluster=" + clusterName + " creation failed with response: " + respString + ". Error:", e1);
       }
-      LOG.info("Remote cluter = " + clusterName + " created.");
-      return true;
     } else {
-      LOG.warn("Remote cluster=" + clusterName + " creation failed with message: " + entity.toString());
+      LOG.warn("Remote cluster=" + clusterName + " creation failed with response: " + respString);
     }
     return false;
   }
@@ -388,7 +394,8 @@ public class CouchbaseReplica {
           .path("createReplication")
           .request()
           .post(Entity.entity(formData, MediaType.APPLICATION_FORM_URLENCODED_TYPE));
-      JSONObject entity = response.readEntity(JSONObject.class);
+      String respString = response.readEntity(String.class);
+      JSONObject entity = new JSONObject(respString);
       if(response.getStatus() == 200) {
         String id = entity.getString("id");
         replications.add(id);

@@ -4,23 +4,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import junit.framework.TestCase;
 
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.couchbase.common.CommonConstants;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class CouchbaseReplicaTest extends TestCase{
-  
-  private static final Logger LOG = LoggerFactory.getLogger(CouchbaseReplicaTest.class);
   
   CouchbaseReplica replica;
 
   @Test
-  public void testXDCR() {
+  public void testXDCR() throws Exception {
     replica = createCouchbaseReplica();
     replica.startCouchbaseReplica();
     assertTrue(replica.isRunning());
@@ -31,13 +28,10 @@ public class CouchbaseReplicaTest extends TestCase{
       exists = replica.createRemoteCluster(clientUuid);
     }
     if(exists) {
-      try {
-        replica.createReplication(clientUuid);
-      } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
-      }
+      List<String> replications = replica.createReplication(clientUuid);
+      assertTrue(replications.size() > 0);
     }
-    replica.stopCouchbaseReplica();
+    replica.close();
   }
   
   public CouchbaseReplica createCouchbaseReplica() {
@@ -52,7 +46,7 @@ public class CouchbaseReplicaTest extends TestCase{
     params.put(CommonConstants.CLIENT_PORT, 9876);
     params.put(CommonConstants.NUM_VBUCKETS_FIELD, 64);
     params.put(CommonConstants.COMMIT_AFTER_BATCH_FIELD, true);
-    params.put(CommonConstants.COUCHBASE_CLUSTER_NAME_FIELD, "Solr");
+    params.put(CommonConstants.COUCHBASE_CLUSTER_NAME_FIELD, getName() + "-" + UUID.randomUUID().toString().replaceAll("-", ""));
     params.put(CommonConstants.USERNAME_FIELD, "Administrator");
     
     List<NamedList<Object>> bucketsList = new ArrayList<NamedList<Object>>();
