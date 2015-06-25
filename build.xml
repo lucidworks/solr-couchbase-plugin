@@ -259,22 +259,13 @@
     </condition>
   </target>
 
-
-  <target name="stop">
-    <exec dir="${exploded.solr.zip.dir}" executable="bin/solr">
-      <arg line="stop -p ${solr.port}" />
-    </exec>
-  </target>
-
-  <!-- Stop two standalone Solr -->
+  <!-- Stop Solr standalone -->
   <target name="stop-solr-standalone">
-    <!-- Stop second server -->
-    <java dir="${solr.dir}" jar="${solr.dir}/jetty-runner-${jetty.runner.version}.jar" fork="true" spawn="true">
+    <java jar="${exploded.solr.zip.dir}/server/start.jar" fork="true" resultproperty="jetty.stop.result">
       <jvmarg line="-Djava.awt.headless=true"/>
-      <sysproperty key="solr.solr.home" value="${solr.dir}"/>
       <sysproperty key="STOP.PORT" value="${solr.stop.port}"/>
       <sysproperty key="STOP.KEY" value="STOP.SOLR"/>
-      <!--<arg value="- -stop"/>-->
+      <arg value="--stop"/>
     </java>
     <echo message="Jetty stop command `java -jar ${solr.dir}/jetty-runner-${jetty.runner.version}.jar -DSTOP.PORT=${solr.stop.port} -DSTOP.KEY=STOP.SOLR --stop` command returned: ${jetty.stop.result}"/>
 
@@ -320,7 +311,7 @@
         patchfile="@{patch.file}"
         originalfile="@{original.file}"
         ignorewhitespace="true"
-        failonerror="true" />
+        failonerror="false" />
     </sequential>
   </macrodef>
   
