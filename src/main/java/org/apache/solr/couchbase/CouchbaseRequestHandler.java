@@ -46,8 +46,6 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   private ElectionWatcher electionWatcher;
   private String collection;
   
-  private NamedList couchbaseServer = null;
-  
   @Override
   public String getSource() { return null; }
 
@@ -84,17 +82,20 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   @Override
   public void init(NamedList args) {
     super.init(args);
+    
+    couchbase = initReplica(args);
+  }
+  
+  public CouchbaseReplica initReplica(NamedList args) {
     Map<String,Object> params = toMap((NamedList<String>)args.get(CommonConstants.HANDLER_PARAMS));
     List<NamedList<Object>> bucketsList = args.getAll(CommonConstants.BUCKET_MARK);
-    couchbaseServer = (NamedList)params.get(CommonConstants.COUCHBASE_SERVER_FIELD);
-    if(couchbaseServer == null) {
+    Map<String,Object> couchbaseServers = toMap((NamedList<String>)params.get(CommonConstants.COUCHBASE_SERVERS_FIELD));
+    params.put(CommonConstants.COUCHBASE_SERVERS_FIELD, couchbaseServers);
+    if(couchbaseServers == null || couchbaseServers.size() <= 0) {
       LOG.info("No Couchbase server configured!");
     }
-    else if(couchbaseServer != null && couchbaseServer.size() <= 0) {
-      LOG.error("Missing content for Couchbase server!");
-    }
     
-    couchbase = new CouchbaseReplica(this, params, bucketsList);
+    return new CouchbaseReplica(this, params, bucketsList);
   }
   
   @Override

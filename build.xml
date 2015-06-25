@@ -223,6 +223,10 @@
     <!--<delete dir="${solr.dir}/solr-webapp/webapp"/>-->
     <echo message="Starting standalone Solr, logging to ${build.dir}/solr-standalone/jetty.stderrout.log"></echo>
     <java dir="${solr.dir}" jar="${solr.dir}/jetty-runner-${jetty.runner.version}.jar" fork="true" spawn="true">
+      <sysproperty key="java.awt.headless" value="true"/>
+      <sysproperty key="solr.solr.home" value="${solr.dir}"/>
+      <sysproperty key="host" value="localhost"/>
+      <sysproperty key="jetty.port" value="${solr.port}"/>
       <jvmarg line="${solr.jvm.args}"/>
       <jvmarg line="-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=5005,suspend=n"/>
       <arg line="--port ${solr.port}"/>
@@ -232,10 +236,6 @@
       <arg line="--log ${solr.dir}/jetty.request.log"/>
       <arg line="--out ${solr.dir}/jetty.stderrout.log"/>
       <arg value="${exploded.solr.war.dir}"/>
-      <sysproperty key="java.awt.headless" value="true"/>
-      <sysproperty key="solr.solr.home" value="${solr.dir}"/>
-      <sysproperty key="host" value="localhost"/>
-      <sysproperty key="jetty.port" value="${solr.port}"/>
     </java>
   </target>
 

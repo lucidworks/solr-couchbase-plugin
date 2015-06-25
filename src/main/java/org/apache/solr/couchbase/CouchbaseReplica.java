@@ -18,7 +18,6 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 
-import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.SolrParams;
@@ -71,14 +70,13 @@ public class CouchbaseReplica {
   private Map<String, String> documentTypeRoutingFields;
   private Map<String,Bucket> buckets;
   private List<String> replications;
+  private Map<String,String> couchbaseServers;
 
   private final Client client;
   private final WebTarget couchbaseService;
   
   public CouchbaseReplica(CouchbaseRequestHandler handler, Map<String,Object> params, List<NamedList<Object>> bucketsList) {
     this.requestHandler = handler;
-    this.serverHost = (params.get(CommonConstants.SERVER_HOST) == null) ? "127.0.0.1" : String.valueOf(params.get(CommonConstants.SERVER_HOST));
-    this.serverPort = (int)params.get(CommonConstants.SERVER_PORT);
     this.clientHost = (params.get(CommonConstants.CLIENT_HOST) == null) ? "127.0.0.1" : String.valueOf(params.get(CommonConstants.CLIENT_HOST));
     this.clientPort = (int)params.get(CommonConstants.CLIENT_PORT);
     this.serverUsername = String.valueOf(params.get(CommonConstants.USERNAME_FIELD));
@@ -91,6 +89,7 @@ public class CouchbaseReplica {
     this.commitAfterBatch = (boolean)params.get(CommonConstants.COMMIT_AFTER_BATCH_FIELD);
     this.buckets = new HashMap<String, Bucket>();
     this.replications = new ArrayList<String>();
+    this.couchbaseServers = new HashMap<String, String>();
     
     for(NamedList<Object> bucket : bucketsList) {
       String name = (String)bucket.get(CommonConstants.NAME_FIELD);
@@ -100,6 +99,25 @@ public class CouchbaseReplica {
       Bucket b = new Bucket(name, splitpath, fieldmappings);
       buckets.put(name, b);
     }
+
+    Map<String,String> serversList= (Map<String,String>) params.get(CommonConstants.COUCHBASE_SERVERS_FIELD);
+    if(serversList != null) {
+      for(Map.Entry<String, String> server : serversList.entrySet()) {
+        this.couchbaseServers.put(server.getKey(), server.getValue());
+      }
+    }
+    // Set Couchbase server host
+    String serverHost = null;
+    int serverPort = -1;
+    for(Map.Entry<String, String> server : couchbaseServers.entrySet()) {
+      String address = server.getValue();
+      String[] parts = address.split(":");
+      serverHost = parts[0];
+      serverPort = Integer.parseInt(parts[1]);
+      break;
+    }
+    this.serverHost = (serverHost == null ? "127.0.0.1" : serverHost);
+    this.serverPort = (serverPort == -1 ? 8091 : serverPort);
     
     this.client = createJerseyClient();
     this.couchbaseService = createCouchbaseServiceTarget();
@@ -138,7 +156,7 @@ public class CouchbaseReplica {
     capiBehaviour = new SolrCAPIBehaviour(this, typeSelector, documentTypeParentFields, documentTypeRoutingFields, commitAfterBatch);
     int vb_num;
     try {
-      vb_num = getNumVBuckets();
+      vb_num = getNumVBucketsFromServer();
       if(vb_num == 64 || vb_num == 1024) {
         numVBuckets = vb_num;
       }
@@ -208,6 +226,42 @@ public class CouchbaseReplica {
     }
     
     return result;
+  }
+
+  public String getClientUsername() {
+    return clientUsername;
+  }
+
+  public String getServerUsername() {
+    return serverUsername;
+  }
+
+  public String getClientPassword() {
+    return clientPassword;
+  }
+
+  public String getServerPassword() {
+    return serverPassword;
+  }
+
+  public String getClusterName() {
+    return clusterName;
+  }
+
+  public boolean isCommitAfterBatch() {
+    return commitAfterBatch;
+  }
+
+  public int getNumVBuckets() {
+    return numVBuckets;
+  }
+
+  public List<String> getReplications() {
+    return replications;
+  }
+
+  public Map<String, String> getCouchbaseServers() {
+    return couchbaseServers;
   }
 
   public CouchbaseRequestHandler getRequestHandler() {
@@ -305,7 +359,7 @@ public class CouchbaseReplica {
     return success;
   }
   
-  public int getNumVBuckets() throws Exception {
+  public int getNumVBucketsFromServer() throws Exception {
     int vbuckets = -1;
     JSONObject obj;
     

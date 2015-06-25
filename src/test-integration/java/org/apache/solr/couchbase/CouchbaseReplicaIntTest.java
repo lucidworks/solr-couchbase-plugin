@@ -12,10 +12,14 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.couchbase.common.CommonConstants;
 import org.junit.Test;
 
-public class CouchbaseReplicaTest extends TestCase{
+public class CouchbaseReplicaIntTest extends TestCase {
   
   CouchbaseReplica replica;
 
+  /**
+   * This test requires Couchbase server running on localhost with default configuration
+   * @throws Exception
+   */
   @Test
   public void testXDCR() throws Exception {
     replica = createCouchbaseReplica();
@@ -35,13 +39,15 @@ public class CouchbaseReplicaTest extends TestCase{
   }
   
   public CouchbaseReplica createCouchbaseReplica() {
-    MockRequestHandler handler = new MockRequestHandler();
+    CouchbaseRequestHandler handler = new CouchbaseRequestHandler();
     
     Map<String,Object> params = new HashMap<String, Object>();
     params.put(CommonConstants.USERNAME_FIELD, "Administrator");
     params.put(CommonConstants.PASSWORD_FIELD, "password");
-    params.put(CommonConstants.SERVER_HOST, "127.0.0.1");
-    params.put(CommonConstants.SERVER_PORT, 8091);
+    Map<String,String> servers = new HashMap<String, String>();
+    servers.put("server1", "127.0.0.1:8091");
+    servers.put("server2", "127.0.0.1:9898");
+    params.put(CommonConstants.COUCHBASE_SERVERS_FIELD, servers);
     params.put(CommonConstants.CLIENT_HOST, "127.0.0.1");
     params.put(CommonConstants.CLIENT_PORT, 9876);
     params.put(CommonConstants.NUM_VBUCKETS_FIELD, 64);

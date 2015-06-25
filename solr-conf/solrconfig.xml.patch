@@ -8,7 +8,7 @@
 +    <lst name="params">
 +      <str name="username">Administrator</str>
 +      <str name="password">password</str>
-+      <int name="port">9876</int>
++      <int name="client_port">9876</int>
 +      <int name="numVBuckets">64</int>
 +      <bool name="commitAfterBatch">true</bool>
 +      <lst name="couchbaseServers">
