@@ -180,9 +180,18 @@ public class CouchbaseRequestHandler extends RequestHandlerBase implements SolrC
   
   public void handleStop() {
     if(couchbase.isRunning()) {
-      couchbase.stopCouchbaseReplica();
+      try {
+        couchbase.close();
+        if(!couchbase.isRunning()) {
+          LOG.info("Couchbase Replica STOPPED successfully.");
+        } else {
+          LOG.warn("Couchbase Replica failed to stop.");
+        }
+      } catch (Exception e) {
+        LOG.error("Failed to stop Couchbase Replica.", e);
+      }
     } else {
-      LOG.info("CAPIServer is not running.");
+      LOG.info("CAPIServer already stopped.");
     }
   }
   
