@@ -257,6 +257,7 @@
   </target>
 
   <target name="modified-solr" depends="patch-solr-modified" description="Copy Solr and update it with Couchbase plugin">
+    <chmod perm="777" dir="${solr.modified.dir}" includes="**/*" parallel="false"></chmod>
   </target>
 
   <target name="package" depends="modified-solr" description="Package Solr with Couchbase plugin">
@@ -529,7 +530,7 @@
     <copy tofile="${zk.dir}/conf/zoo.cfg" overwrite="true">
       <fileset dir="${zk.conf.dir}" includes="zoo.cfg"/>
     </copy>
-    <chmod file="${zk.dir}/bin/zkServer.sh" perm="u+x"/>
+    <chmod file="${zk.dir}/bin" includes="**/*" perm="777"/>
   </target>
   
   <target name="run-zk" depends="prep-zk" description="Run standalone ZooKeeper server">
@@ -541,6 +542,12 @@
   <target name="stop-zk" depends="" description="Stop standalone ZooKeeper server">
     <exec dir="${zk.dir}/bin" executable="./zkServer.sh">
       <arg value="stop"/>
+    </exec>
+  </target>
+
+  <target name="upload-zk-config" depends="patch-solr-cloud">
+    <exec dir="${zk.dir}/bin" executable="./zkCli.sh">
+      <arg line="-cmd upconfig -zkhost localhost:${solr.cloud.zk.port} -confname ${configname} -solrhome ${solr.cloud.dir.1} -confdir ${solr.cloud.dir.1}/configsets"/>
     </exec>
   </target>
   
@@ -578,6 +585,67 @@
         <include name="**/*" />
       </tarfileset>
     </tar>
+  </target>
+
+  <!-- Group of tasks using Solr startup scripts for running modified solr -->
+
+  <target name="start-solr" depends="modified-solr">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" start -h localhost -p ${solr.port} -a -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005"/>
+    </exec>
+    <antcall target="create-core"></antcall>
+  </target>
+  
+  <target name="stop-solr2">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" stop -p ${solr.port}"/>
+    </exec>
+  </target>
+  
+  <target name="create-core">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" create_core -c collection1 -shards ${solr.cloud.num.shards} -p ${solr.port}"/>
+    </exec>
+  </target>
+
+  <target name="start-node-1">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" start -c -h localhost -p ${solr.cloud.port.1} -s ${solr.cloud.dir.1}"/>
+    </exec>
+  </target>
+  
+  <target name="start-node-2">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" start -c -h localhost -p ${solr.cloud.port.2} -s ${solr.cloud.dir.2} -z localhost:${solr.cloud.zk.port}"/>
+    </exec>
+  </target>
+  
+  <target name="stop-node-1">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" stop -p ${solr.cloud.port.1}"/>
+    </exec>
+  </target>
+  
+  <target name="stop-node-2">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" stop -p ${solr.cloud.port.2}"/>
+    </exec>
+  </target>
+  
+  <target name="cloud-create-collection">
+    <exec executable="${solr.modified.dir}/bin/solr">
+      <arg line=" create_collection -c collection1 -shards ${solr.cloud.num.shards} -p ${solr.cloud.port.1}"/>
+    </exec>
+  </target>
+  
+  <target name="wait-for-solr2">
+    <sleep seconds="10"/>
+  </target>
+  
+  <target name="solr-cloud2" depends="modified-solr, prep-solr-cloud, start-node-1, wait-for-solr2, start-node-2, cloud-create-collection">
+  </target>
+  
+  <target name="stop-solr-cloud2" depends="stop-node-2, stop-node-1">
   </target>
   
 </project>
