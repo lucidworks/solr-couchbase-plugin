@@ -3,123 +3,77 @@ solr-couchbase-plugin
 
 This plugin allows to import CouchBase data to Solr. It uses the Cross-datacenter Replication (XDCR) feature of Couchbase Server 2.0 to transfer data continuously.
 
-# Plugin configuration
 
-
-## Dependencies
-
-* Copy this plugin from `solr-shared-libs/` to the directory:
+# Installation
+* Get Solr distribution
+* Extract Solr war from `<extracted-solr>/server/webapps/solr.war` 
+* Copy this plugin and its dependencies from `solr-war-libs/` directory to the extracted solr war directory. Dependencies should be located in the war file under:
 ```
-<solr_home>/solr/lib-couchbase/
+<extracted-solr-war>/WEB-INF/lib/
 ```
-* Add dependencies from `solr-war-libs/` directory to solr.war and remove the older **commons-io** dependency version (2.3). Dependencies should be located in the war file under:
-```
-<solr-war>/WEB-INF/lib/
-```
-
-
-## solr.xml
-
-An additional line to solr.xml should be added, to inform Solr about new dependencies which should be included in the Solr's classpath. Add the following line to solr.xml file:
-
-```
-<str name="sharedLib">${sharedLib:lib-couchbase}</str>
-```
-
-The whole solr.xml file should look as follows:
-
-```
-<solr>
-  <str name="sharedLib">${sharedLib:lib-couchbase}</str>
-
-  <solrcloud>
-    <str name="host">${host:}</str>
-    <int name="hostPort">${jetty.port:8983}</int>
-    <str name="hostContext">${hostContext:solr}</str>
-    <int name="zkClientTimeout">${zkClientTimeout:30000}</int>
-    <bool name="genericCoreNodeNames">${genericCoreNodeNames:true}</bool>
-  </solrcloud>
-
-  <shardHandlerFactory name="shardHandlerFactory"
-    class="HttpShardHandlerFactory">
-    <int name="socketTimeout">${socketTimeout:0}</int>
-    <int name="connTimeout">${connTimeout:0}</int>
-  </shardHandlerFactory>
-
-</solr>
-```
+* Assemble war from the `<extracted-solr-war>` and put it back to the `<extracted-solr>/server/webapps` directory overwriting original file.
+* Start Solr
 
 
 ## solrconfig.xml
 
-It is required to configure Couchbase buckets to index data from in the solrconfig.xml file under */couchbase* RequestHandler. Whole RequestHandler configuration should look as following:
+It is required to configure Couchbase plugin in `solrconfig.xml` file under */couchbase* RequestHandler. Whole RequestHandler configuration should look as following:
 
 ```
 <requestHandler name="/couchbase" class="org.apache.solr.couchbase.CouchbaseRequestHandler">
-  <lst name="params">
-    <str name="username">admin</str>
-    <str name="password">admin123</str>
-    <int name="port">9876</int>
-    <int name="numVBuckets">1024</int>
-    <bool name="commitAfterBatch">false</bool>
-    <bool name="optimize">false</bool>
-    
-    <!-- Optional, setting for Couchbase XDCR remote cluster and replication -->
-    <lst name="couchbaseServer">
-    	<str name="ipAddress">127.0.0.1</str>
-        <str name="couchbaseUsername">Administrator</str>
-        <str name="couchbasePassword">password</str>
-        <str name="clusterName">Solr</str>
-
-        <lst name="bucketInfo">
-        	<str name="fromBucketName">test</str>
-            <str name="toBucketName">default</str>
-        </lst>
-
-        <lst name="bucketInfo">
-        	<str name="fromBucketName">program</str>
-       		<str name="toBucketName">default</str>
-        </lst>
+    <lst name="params">
+      <str name="username">Administrator</str>
+      <str name="password">password</str>
+      <int name="client_port">9876</int>
+      <int name="numVBuckets">64</int>
+      <bool name="commitAfterBatch">true</bool>
+      <lst name="couchbaseServers">
+        <str name="server1">127.0.0.1:8091</str>
+        <str name="server2">127.0.0.1:9898</str>
+      </lst>
+      <str name="clusterName">solr</str>
     </lst>
-  </lst>
-  
-  <lst name="bucket">
-    <str name="name">default</str>
-    <str name="splitpath">/</str>
-    <lst name="fieldmappings">
-      <str name="name">name:/name</str>
-      <str name="city">city_s:/city</str>
-      <str name="code">code_s:/code</str>
-      <str name="country">country_s:/country</str>
-      <str name="phone">phone_s:/phone</str>
-      <str name="website">url:/website</str>
-      <str name="type">type_s:/type</str>
-      <str name="updated">last_modified:/updated</str>
-      <str name="description">description:/description</str>
-      <str name="address">address_s:/address</str>
-      <str name="geo">geo_s:/geo</str>
+    <lst name="bucket">
+      <str name="name">beer-sample</str>
+      <str name="splitpath">/</str>
+      <lst name="fieldmappings">
+        <str name="address">address_ss:/address</str>
+        <str name="all">/*</str>
+      </lst>
     </lst>
-  </lst>
-</requestHandler>
+    <lst name="bucket">
+      <str name="name">gamesim-sample</str>
+      <str name="splitpath">/</str>
+      <lst name="fieldmappings">
+        <str name="all">/*</str>
+      </lst>
+    </lst>
+    <lst name="bucket">
+      <str name="name">test</str>
+      <str name="splitpath">/exams</str>
+      <lst name="fieldmappings">
+        <str name="first">first_s:/first</str>
+        <str name="last">last_s:/last</str>
+        <str name="grade">grade_i:/grade</str>
+        <str name="subject">subject_s:/exams/subject</str>
+        <str name="test">test_s:/exams/test</str>
+        <str name="marks">marks_i:/exams/marks</str>
+        <str name="other">/*</str>
+      </lst>
+    </lst>
+  </requestHandler>
 ```
 
 * params - a list of params required to configure this plugin.
   - username - A valid Couchbase server username
   - password - A valid Couchbase server password
-  - port - A port number on which this plugin will register itself as a Couchbase replica.
+  - client_port - A port number on which this plugin will register itself as a Couchbase replica.
   - numVBuckets - A number of VBuckets used by this Couchbase replica. Couchbase Server on Mac OS X uses 64 vBuckets as opposed to the 1024 vBuckets used by other platforms. **Couchbase clusters with mixed platforms are not supported.** It is required that numVBuckets is identical on the Couchbase server and Solr plugin.
   - commitAfterBatch - A flag specifying whether this plugin should commit documents to Solr after every batch of documents or when all the documents are retrieved from Couchbase.
+  - couchbaseServers - Required, a list of addresses of Couchbase Servers.
+  - clusterName - Required. The cluster name that you want to create Couchbase XDCR remote cluster with.
   
-  - couchbaseServer - Optional, a list with attributes that are required for creating Couchbase XDCR remote cluster and/or XDCR replication.
-  - ipAddress - The IP address at where this plugin is running. Required if you have couchbaseServer field.
-  - couchbaseUsername - The username of target Couchbase instance. With this field the plugin can get authorized by Couchbase. Required if you have couchbaseServer field.
-  - couchbasePassword - The password of target Couchbase instance. With this field the plugin can get authorized by Couchbase. Required if you have couchbaseServer field.
-  - clusterName - The cluster name that you want to create Couchbase XDCR remote cluster with. Required if you have couchbaseServer field.
-  - bucketInfo - Optional, a list with attributes that are required for crteating Couchbase XDCR replication.
-  - fromBucketName - The Couchbase bucket name where you want to pull data from. Required if you have bucketInfo field.
-  - toBucketName - The destination bucket name where you want to push data to. Basically you have to use the names that are specified in "bucket" list. Required if you have bucketInfo field.
-  
-* bucket - a list with bucket parameters required to perform a synchronisation with Couchbase. Multiple lists of this type are allowed.
+* bucket - a list with bucket parameters required to perform a synchronisation with Couchbase. Multiple lists of this type are allowed. Couchbase plugin will automatically configure replication from the buckets specified in this list.
   - name - Bucket name - must be unique
   - splitpath - a list with paths to the fields in JSON Object on which the original Couchbase JSON document will be split up to extract embedded documents. This is a single String where paths are saparated with "|".
   - fieldmappings - a list with field names mapping for Couchbase documents, before indexing them into Solr. List element's name must be unique. At least one field mapping must be provided. Value should be `solr_field_name:couchbase_field_path`. The ‘json-path’ is a required part. 'target-field-name' is the name of the field in the input Solr document.  It is optional and it is automatically derived from the input json.
@@ -180,25 +134,7 @@ Example field mappings for above JSON:
 
 
 ## Couchbase XDCR
-
-In Couchbase admin panel, under XDCR tab following settings should be configured:
-
-### Remote Cluster
-
-This Solr plugin should be configured as Couchbase's Remote Cluster. Click on 'Create Cluster Reference' button and fill in cluster data.
-
-* 'Cluster Name' can be any name.
-* 'IP/hostname' should be `<ip_address>:port` and the port number is the port on which this request handler will register itself as a Couchbase Replica. It is specified in CouchbaseRequestHandler's **params** list as 'port'.
-* Username and password should be the same as those provided in solrconfig.xml file, as the replica starts with the same credentials as the Couchbase server.
- 
-### Replication
-
-Click on 'Create Replication' button.
-
-* Select a Couchbase Cluster and a Bucket to replicate from.
-* Select configured Solr's Plugin Remote Cluster and add a Bucket name. This Bucket name must match the name specified in the bucket **name** parameter in the solrconfig.xml file.
-* Under *Advaced settings* **XDCR Prootcol** should be set to 'Version 1' value.
-
+Couchbase plugin automatically configures replication from the buckets configured in `solrconfig.xml` file.
 
 # Multiple collections
 
