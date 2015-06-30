@@ -343,10 +343,6 @@
   <target name="prep-solr-cloud" depends="get-solr, ivy-init, jar, ivy-resolve-runtime, ivy-resolve-jetty, ivy-resolve-solr-jetty">
     <prep-solr solr.zip.dir="${exploded.solr.zip.dir}" to.dir="${solr.cloud.dir.1}" solr.version="${solr.server.version}"/>
     <prep-solr solr.zip.dir="${exploded.solr.zip.dir}" to.dir="${solr.cloud.dir.2}" solr.version="${solr.server.version}"/>
-
-    <copy todir="${solr.cloud.dir.1}/collection1">
-      <fileset dir="${solr.cloud.dir.1}/configsets/sample_techproducts_configs/" includes="**"/>
-    </copy>
   </target>
   
   <target name="check-patches-exist">
@@ -530,7 +526,7 @@
     <copy tofile="${zk.dir}/conf/zoo.cfg" overwrite="true">
       <fileset dir="${zk.conf.dir}" includes="zoo.cfg"/>
     </copy>
-    <chmod file="${zk.dir}/bin" includes="**/*" perm="777"/>
+    <chmod dir="${zk.dir}/bin" includes="**/*" perm="777"/>
   </target>
   
   <target name="run-zk" depends="prep-zk" description="Run standalone ZooKeeper server">
@@ -545,13 +541,12 @@
     </exec>
   </target>
 
-  <target name="upload-zk-config" depends="patch-solr-cloud">
+  <target name="upload-config" depends="">
     <exec dir="${zk.dir}/bin" executable="./zkCli.sh">
-      <arg line="-cmd upconfig -zkhost localhost:${solr.cloud.zk.port} -confname ${configname} -solrhome ${solr.cloud.dir.1} -confdir ${solr.cloud.dir.1}/configsets"/>
+      <arg line="-cmd upconfig -zkhost localhost:${solr.cloud.zk.port} -confname ${configname} -confdir ${solr.cloud.dir.1}/configsets/data_driven_schema_configs/conf"/>
     </exec>
   </target>
-  
-  <!-- Deprecated -->
+
   <target name="dist" depends="prep-solr, patch-solr" description="Create Solr Couchbase plugin package">
     <mkdir dir="${dist.dir}"/>
     <copy todir="${dist.dir}">
