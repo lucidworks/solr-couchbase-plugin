@@ -95,7 +95,7 @@
     
   <target name="clean-solr" description="Cleans solr/ directory with exception for solr/dist/">
     <delete>
-      <fileset dir="${solr.dir}">
+      <fileset dir="${solr.standalone.dir}">
         <exclude name="dist/**/*"/>
         <include name="**/*"/>
       </fileset>
@@ -128,7 +128,7 @@
   </target>
   
   <target name="jar" description="Jar this project" depends="compile">
-    <jar destfile="${build.dir}/${ant.project.name}-${solr.couchbase.plugin.version}.jar">
+    <jar destfile="${dist.dir}/${ant.project.name}-${solr.couchbase.plugin.version}.jar">
       <fileset dir="${classes.dir}" />
       <manifest>
           <attribute name="Built-By" value="${user.name}"/>
@@ -163,7 +163,7 @@
   </target>
   
   <target name="prep-solr" depends="ivy-init, get-solr, jar, ivy-resolve-jetty, ivy-resolve-solr-jetty, ivy-resolve-runtime" >
-    <prep-solr solr.zip.dir="${exploded.solr.zip.dir}" to.dir="${solr.dir}" solr.version="${solr.server.version}"/>
+    <prep-solr solr.zip.dir="${exploded.solr.zip.dir}" to.dir="${solr.standalone.dir}" solr.version="${solr.server.version}"/>
   </target>
   
   <macrodef name="prep-solr">
@@ -182,7 +182,7 @@
       
       <!-- copy Solr war -->
       <copy todir="${solr.war.dir}">
-        <!--<fileset dir="${solr.dir}/example/webapps/" includes="solr.war"/>-->
+        <!--<fileset dir="${solr.standalone.dir}/example/webapps/" includes="solr.war"/>-->
         <fileset dir="@{solr.zip.dir}/server/webapps/" includes="solr.war"/>
       </copy>
       <chmod file="@{solr.zip.dir}/bin/solr" perm="755"/>
@@ -208,16 +208,16 @@
       <copy todir="${exploded.solr.war.dir}/WEB-INF/lib">
         <fileset dir="${lib.dir}/runtime" includes="*.jar"/>
         <fileset dir="${lib.dir}/solr.jetty" includes="*.jar"/>
-        <fileset dir="${build.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
+        <fileset dir="${dist.dir}" includes="${ant.project.name}-${solr.couchbase.plugin.version}.jar"/>
       </copy>
     </sequential>
   </macrodef>
   
   <target name="patch-solr" depends="check-patches-exist, prep-solr">
-    <patch-solr original.file="${solr.dir}/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
-    <patch-solr original.file="${solr.dir}/configsets/basic_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
-    <patch-solr original.file="${solr.dir}/configsets/data_driven_schema_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
-    <patch-solr original.file="${solr.dir}/configsets/sample_techproducts_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.standalone.dir}/solr.xml" patch.file="${solr.conf.overrides.dir}/solr.xml.patch"/>
+    <patch-solr original.file="${solr.standalone.dir}/configsets/basic_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.standalone.dir}/configsets/data_driven_schema_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.standalone.dir}/configsets/sample_techproducts_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
   </target>
 
   <macrodef name="patch-solr">
@@ -234,12 +234,42 @@
     </sequential>
   </macrodef>
 
+  <target name="war" depends="prep-solr">
+    <war destfile="${dist.dir}/solr.war">
+      <fileset dir="${exploded.solr.war.dir}"/>
+    </war>
+  </target>
+
+  <target name="copy-solr" depends="war">
+    <mkdir dir="${solr.modified.dir}"/>
+    <copy todir="${solr.modified.dir}">
+      <fileset dir="${exploded.solr.zip.dir}" includes="**/*"/>
+    </copy>
+    <copy todir="${solr.modified.dir}/server/webapps" overwrite="true">
+      <fileset dir="${dist.dir}" includes="solr.war"/>
+    </copy>
+  </target>
+
+  <target name="patch-solr-modified" depends="copy-solr" description="Prepare solrconfigs of the modified Solr distribution">
+    <patch-solr original.file="${solr.modified.dir}/server/solr/configsets/basic_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.modified.dir}/server/solr/configsets/data_driven_schema_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+    <patch-solr original.file="${solr.modified.dir}/server/solr/configsets/sample_techproducts_configs/conf/solrconfig.xml" patch.file="${solr.conf.overrides.dir}/solrconfig.xml.patch"/>
+  </target>
+
+  <target name="modified-solr" depends="patch-solr-modified" description="Copy Solr and update it with Couchbase plugin">
+  </target>
+
+  <target name="package" depends="modified-solr" description="Package Solr with Couchbase plugin">
+    <zip destfile="${dist.dir}/solr-${solr.server.version}-couchbase-plugin-${solr.couchbase.plugin.version}.zip" basedir="${solr.modified.dir}" update="true">
+    </zip>
+  </target>
+
   <target name="run-solr" description="Run interactive Solr" depends="prep-solr, patch-solr">
-    <!--<delete dir="${solr.dir}/solr-webapp/webapp"/>-->
+    <!--<delete dir="${solr.standalone.dir}/solr-webapp/webapp"/>-->
     <echo message="Starting standalone Solr, logging to ${build.dir}/solr-standalone/jetty.stderrout.log"></echo>
-    <java dir="${solr.dir}" jar="${solr.dir}/jetty-runner-${jetty.runner.version}.jar" fork="true" spawn="true">
+    <java dir="${solr.standalone.dir}" jar="${solr.standalone.dir}/jetty-runner-${jetty.runner.version}.jar" fork="true" spawn="true">
       <sysproperty key="java.awt.headless" value="true"/>
-      <sysproperty key="solr.solr.home" value="${solr.dir}"/>
+      <sysproperty key="solr.solr.home" value="${solr.standalone.dir}"/>
       <sysproperty key="host" value="localhost"/>
       <sysproperty key="jetty.port" value="${solr.port}"/>
       <jvmarg line="${solr.jvm.args}"/>
@@ -248,8 +278,8 @@
       <arg line="--stop-port ${solr.stop.port}"/>
       <arg line="--stop-key STOP.SOLR"/>
       <arg line="--path /solr"/>
-      <arg line="--log ${solr.dir}/jetty.request.log"/>
-      <arg line="--out ${solr.dir}/jetty.stderrout.log"/>
+      <arg line="--log ${solr.standalone.dir}/jetty.request.log"/>
+      <arg line="--out ${solr.standalone.dir}/jetty.stderrout.log"/>
       <arg value="${exploded.solr.war.dir}"/>
     </java>
   </target>
@@ -266,8 +296,8 @@
 
   <target name="solr" depends="wait-for-solr">
   <!-- create default core -->
-    <copy todir="${solr.dir}/collection1">
-      <fileset dir="${solr.dir}/configsets/sample_techproducts_configs/" includes="**"/>
+    <copy todir="${solr.standalone.dir}/collection1">
+      <fileset dir="${solr.standalone.dir}/configsets/sample_techproducts_configs/" includes="**"/>
     </copy>
     <condition property="createCoreStatus" value="true">
       <http url="http://localhost:${solr.port}/solr/admin/cores?action=CREATE&amp;name=collection1&amp;instanceDir=collection1"/>
@@ -282,7 +312,7 @@
       <sysproperty key="STOP.KEY" value="STOP.SOLR"/>
       <arg value="--stop"/>
     </java>
-    <echo message="Jetty stop command `java -jar ${solr.dir}/jetty-runner-${jetty.runner.version}.jar -DSTOP.PORT=${solr.stop.port} -DSTOP.KEY=STOP.SOLR --stop` command returned: ${jetty.stop.result}"/>
+    <echo message="Jetty stop command `java -jar ${solr.standalone.dir}/jetty-runner-${jetty.runner.version}.jar -DSTOP.PORT=${solr.stop.port} -DSTOP.KEY=STOP.SOLR --stop` command returned: ${jetty.stop.result}"/>
 
   <!--
     <sleep seconds="10"/>
@@ -464,6 +494,7 @@
       <arg line="--path /solr"/>
       <arg line="--log ${solr.cloud.dir.2}/jetty.request.log"/>
       <arg line="--out ${solr.cloud.dir.2}/jetty.stderrout.log"/>
+      <arg value="${exploded.solr.war.dir}"/>
     </java>
   </target>
 
@@ -513,6 +544,7 @@
     </exec>
   </target>
   
+  <!-- Deprecated -->
   <target name="dist" depends="prep-solr, patch-solr" description="Create Solr Couchbase plugin package">
     <mkdir dir="${dist.dir}"/>
     <copy todir="${dist.dir}">
@@ -531,10 +563,10 @@
     </copy>
     <mkdir dir="${dist.dir}/example"/>
     <copy todir="${dist.dir}/example">
-      <fileset dir="${solr.dir}/solr">
+      <fileset dir="${solr.standalone.dir}/solr">
         <include name="solr.xml" />
       </fileset>
-      <fileset dir="${solr.dir}/solr/collection1/conf">
+      <fileset dir="${solr.standalone.dir}/solr/collection1/conf">
         <include name="solrconfig.xml" />
       </fileset>
     </copy>
